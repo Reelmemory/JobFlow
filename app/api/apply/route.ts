@@ -11,16 +11,15 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { title, company, location, description, matchScore, url } = body
+    const { title, company, location, description, matchScore } = body
 
-    if (!title || !company) {
-      return NextResponse.json({ error: 'Missing job info' }, { status: 400 })
+    if (typeof title !== 'string' || !title.trim() ||
+        typeof company !== 'string' || !company.trim()) {
+      return NextResponse.json({ error: 'Valid job title and company are required' }, { status: 400 })
     }
 
-    // Get or create user
     let user = await prisma.user.findUnique({ where: { clerkId } })
     if (!user) {
-      // In real app you sync from Clerk webhook. For now create minimal user.
       user = await prisma.user.create({
         data: {
           clerkId,
@@ -30,26 +29,33 @@ export async function POST(req: Request) {
       })
     }
 
-    // Get profile (or use fallback resume text)
     const profile = await prisma.profile.findUnique({ where: { userId: user.id } })
-    const resumeText = profile?.resumeText || 'Experienced professional seeking new opportunities. Strong background in technology and problem solving.'
+    const resumeText = profile?.resumeText?.trim()
+    if (!resumeText) {
+      return NextResponse.json(
+        { error: 'Add your resume to your profile before generating a cover letter.' },
+        { status: 400 }
+      )
+    }
 
-    // Generate cover letter
     const coverLetter = await generateCoverLetter({
       resumeText,
-      jobTitle: title,
-      company,
-      jobDescription: description || `${title} at ${company}`,
+      jobTitle: title.trim(),
+      company: company.trim(),
+      jobDescription: typeof description === 'string' ? description : `${title} at ${company}`,
     })
 
-    // Save application
+    if (!coverLetter.trim()) {
+      return NextResponse.json({ error: 'The cover letter could not be generated. Please try again.' }, { status: 502 })
+    }
+
     const application = await prisma.application.create({
       data: {
         userId: user.id,
-        title,
-        company,
+        title: title.trim(),
+        company: company.trim(),
         coverLetter,
-        matchScore: matchScore || null,
+        matchScore: Number.isInteger(matchScore) ? matchScore : null,
         status: 'draft',
         source: 'ai',
       },
@@ -57,7 +63,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, applicationId: application.id, coverLetter })
   } catch (error) {
-    console.error('Apply error:', error)
-    return NextResponse.json({ error: 'Failed to apply' }, { status: 500 })
+    console.error('Cover letter generation error:', error)
+    return NextResponse.json({ error: 'Failed to generate cover letter' }, { status: 500 })
   }
 }
