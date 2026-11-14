@@ -1,12 +1,10 @@
-// Known Nigerian tech companies that use public ATS boards
-// Add more as you discover their board slugs
+// Known Nigerian tech companies that use public ATS boards.
 export const NIGERIAN_TECH_ATS = [
   { company: 'Moniepoint', ats: 'greenhouse', slug: 'moniepoint' },
   { company: 'Flutterwave', ats: 'greenhouse', slug: 'flutterwave' },
   { company: 'Andela', ats: 'greenhouse', slug: 'andela' },
   { company: 'Paystack', ats: 'lever', slug: 'paystack' },
   { company: 'PiggyVest', ats: 'greenhouse', slug: 'piggyvest' },
-  // Add more here
 ] as const
 
 export type JobSource = {
@@ -25,9 +23,12 @@ export async function fetchRemotiveJobs(search = 'software'): Promise<JobSource[
   try {
     const res = await fetch(
       `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(search)}&limit=20`,
-      { next: { revalidate: 3600 } } // cache 1 hour
+      { next: { revalidate: 3600 } }
     )
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.error('Remotive returned', res.status)
+      return []
+    }
     const data = await res.json()
     return (data.jobs || []).map((j: any) => ({
       id: `remotive-${j.id}`,
@@ -40,8 +41,8 @@ export async function fetchRemotiveJobs(search = 'software'): Promise<JobSource[
       remote: true,
       postedAt: j.publication_date,
     }))
-  } catch (e) {
-    console.error('Remotive error', e)
+  } catch (error) {
+    console.error('Remotive error', error)
     return []
   }
 }
@@ -51,17 +52,16 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
 
   for (const board of NIGERIAN_TECH_ATS) {
     try {
-      let url = ''
-      if (board.ats === 'greenhouse') {
-        url = `https://boards-api.greenhouse.io/v1/boards/${board.slug}/jobs?content=true`
-      } else if (board.ats === 'lever') {
-        url = `https://api.lever.co/v0/postings/${board.slug}?mode=json`
-      } else {
-        continue
-      }
+      const url =
+        board.ats === 'greenhouse'
+          ? `https://boards-api.greenhouse.io/v1/boards/${board.slug}/jobs?content=true`
+          : `https://api.lever.co/v0/postings/${board.slug}?mode=json`
 
       const res = await fetch(url, { next: { revalidate: 3600 } })
-      if (!res.ok) continue
+      if (!res.ok) {
+        console.error(`${board.company} ATS returned`, res.status)
+        continue
+      }
       const data = await res.json()
 
       if (board.ats === 'greenhouse') {
@@ -77,7 +77,7 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
             remote: false,
           })
         }
-      } else if (board.ats === 'lever') {
+      } else {
         for (const j of data || []) {
           jobs.push({
             id: `lever-${board.slug}-${j.id}`,
@@ -91,8 +91,8 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
           })
         }
       }
-    } catch (e) {
-      console.error(`ATS error ${board.company}`, e)
+    } catch (error) {
+      console.error(`ATS error for ${board.company}`, error)
     }
   }
 
@@ -113,15 +113,20 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
         next: { revalidate: 3600 },
       }
     )
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.error('Techmap returned', res.status)
+      return []
+    }
     const data = await res.json()
+    const techKeywords = [
+      'engineer', 'developer', 'software', 'tech', 'it ', 'data',
+      'devops', 'frontend', 'backend', 'fullstack',
+    ]
 
-    // Filter to tech-ish roles
-    const techKeywords = ['engineer', 'developer', 'software', 'tech', 'it ', 'data', 'devops', 'frontend', 'backend', 'fullstack']
     return (data.jobs || data.results || [])
       .filter((j: any) => {
         const text = `${j.title || ''} ${j.description || ''}`.toLowerCase()
-        return techKeywords.some(k => text.includes(k))
+        return techKeywords.some(keyword => text.includes(keyword))
       })
       .map((j: any) => ({
         id: `techmap-${j.id || j.jobId}`,
@@ -129,24 +134,22 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
         company: j.company || j.companyName || 'Unknown',
         location: j.location || j.city || 'Nigeria',
         description: j.description || '',
-        url: j.url || j.applyUrl || '#',
+        url: j.url || j.applyUrl || '',
         source: 'techmap',
         remote: (j.workPlace || '').toLowerCase().includes('remote'),
         postedAt: j.dateCreated || j.postedAt,
       }))
-  } catch (e) {
-    console.error('Techmap error', e)
+  } catch (error) {
+    console.error('Techmap error', error)
     return []
   }
 }
 
 export function scoreJob(job: JobSource, resumeText: string): number {
-  if (!resumeText || resumeText.length < 20) return 50
+  if (!resumeText || resumeText.trim().length < 20) return 0
 
   const resume = resumeText.toLowerCase()
   const jobText = `${job.title} ${job.description}`.toLowerCase()
-
-  // Simple keyword overlap
   const keywords = [
     'react', 'next', 'node', 'typescript', 'javascript', 'python', 'java',
     'aws', 'docker', 'kubernetes', 'sql', 'postgres', 'mongodb',
@@ -154,26 +157,23 @@ export function scoreJob(job: JobSource, resumeText: string): number {
     'engineer', 'developer', 'software', 'senior', 'lead', 'manager',
   ]
 
-  let matches = 0
-  for (const kw of keywords) {
-    if (resume.includes(kw) && jobText.includes(kw)) matches++
-  }
+  const matches = keywords.filter(keyword =>
+    resume.includes(keyword) && jobText.includes(keyword)
+  ).length
 
-  // Base + overlap bonus, capped
-  const score = Math.min(95, 40 + matches * 8)
-  return score
+  return Math.min(95, 40 + matches * 8)
 }
+
+export async function fetchAllJobs(apiKey?: string): Promise<JobSource[]> {
   const [remotive, ats, techmap] = await Promise.all([
     fetchRemotiveJobs('software engineer'),
     fetchATSJobs(),
-    fetchTechmapJobs(techmapKey),
+    fetchTechmapJobs(apiKey),
   ])
 
-  // Deduplicate roughly by title+company
   const seen = new Set<string>()
-  const all = [...remotive, ...ats, ...techmap]
-  return all.filter(j => {
-    const key = `${j.title.toLowerCase()}-${j.company.toLowerCase()}`
+  return [...remotive, ...ats, ...techmap].filter(job => {
+    const key = `${job.title.toLowerCase().trim()}-${job.company.toLowerCase().trim()}`
     if (seen.has(key)) return false
     seen.add(key)
     return true
