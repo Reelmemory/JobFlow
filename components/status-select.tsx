@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-const STATUSES = ['applied', 'viewed', 'interview', 'rejected', 'offer']
+const STATUSES = ['draft', 'applied', 'viewed', 'interview', 'rejected', 'offer']
 
 export function StatusSelect({ id, current }: { id: string; current: string }) {
   const [status, setStatus] = useState(current)
