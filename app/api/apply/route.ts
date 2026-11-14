@@ -5,7 +5,7 @@ import { generateCoverLetter } from '@/lib/openai'
 
 export async function POST(req: Request) {
   try {
-    const { userId: clerkId } = auth()
+    const { userId: clerkId } = await auth()
     if (!clerkId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
         company,
         coverLetter,
         matchScore: matchScore || null,
-        status: 'applied',
+        status: 'draft',
         source: 'ai',
       },
     })
