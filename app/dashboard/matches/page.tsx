@@ -43,14 +43,14 @@ export default function MatchesPage() {
           company: job.company,
           location: job.location,
           description: job.description,
-          matchScore: job.match || 75,
+          matchScore: job.match || 0,
           url: job.url,
         }),
       })
 
       const data = await res.json()
       if (data.success) {
-        setMessage(`Applied to ${job.title} at ${job.company}. Cover letter generated.`)
+        setMessage(`Cover letter prepared for ${job.title} at ${job.company}. Review it and submit on the employer's website.`)
       } else {
         setMessage(data.error || 'Failed')
       }
