@@ -9,7 +9,7 @@ type Email = {
   subject: string
   body: string
   isRead: boolean
-  createdAt: string
+  receivedAt: string
 }
 
 export default function InboxPage() {
@@ -79,7 +79,7 @@ export default function InboxPage() {
             >
               <div className="font-medium text-sm truncate">{email.subject}</div>
               <div className="text-xs text-slate-500 truncate">{email.from}</div>
-              <div className="text-xs text-slate-400">{new Date(email.createdAt).toLocaleDateString()}</div>
+              <div className="text-xs text-slate-400">{new Date(email.receivedAt).toLocaleDateString()}</div>
             </button>
           ))
         )}
