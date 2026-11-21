@@ -43,14 +43,14 @@ export default function MatchesPage() {
           company: job.company,
           location: job.location,
           description: job.description,
-          matchScore: job.match || 75,
+          matchScore: job.match || 0,
           url: job.url,
         }),
       })
 
       const data = await res.json()
       if (data.success) {
-        setMessage(`Applied to ${job.title} at ${job.company}. Cover letter generated.`)
+        setMessage(`Cover letter prepared for ${job.title} at ${job.company}. Open your draft in Applications, then submit it on the employer's website.`)
       } else {
         setMessage(data.error || 'Failed')
       }
@@ -93,13 +93,13 @@ export default function MatchesPage() {
                 <p className="text-xs text-slate-500 mt-2 line-clamp-2">{job.description.slice(0, 180)}...</p>
               </div>
               <div className="flex flex-col items-end gap-2">
-                <span className="text-sm font-medium text-blue-600">{job.match || 75}% match</span>
+                <span className="text-sm font-medium text-blue-600">{job.match ?? 0}% match</span>
                 <button
                   onClick={() => applyWithAI(job)}
                   disabled={applying === job.id}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {applying === job.id ? 'Applying...' : 'Apply with AI'}
+                  {applying === job.id ? 'Preparing...' : 'Generate cover letter'}
                 </button>
                 <a href={job.url} target="_blank" rel="noreferrer" className="text-xs text-slate-500 underline">
                   View original

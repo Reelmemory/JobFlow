@@ -4,11 +4,12 @@ import { prisma } from '@/lib/prisma'
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { id } = await params
   const { status } = await req.json()
   const allowed = ['applied', 'viewed', 'interview', 'rejected', 'offer']
   if (!allowed.includes(status)) {
@@ -16,7 +17,7 @@ export async function PATCH(
   }
 
   const app = await prisma.application.updateMany({
-    where: { id: params.id, user: { clerkId: userId } },
+    where: { id, user: { clerkId: userId } },
     data: { status },
   })
 

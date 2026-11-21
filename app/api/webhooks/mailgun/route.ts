@@ -1,61 +1,53 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// Mailgun inbound webhook
-// Configure in Mailgun: Routes → store and notify → POST to /api/webhooks/mailgun
+function isValidMailgunSignature(timestamp: string, token: string, signature: string) {
+  const signingKey = process.env.MAILGUN_WEBHOOK_SIGNING_KEY
+  if (!signingKey || !timestamp || !token || !signature) return false
+
+  const expected = createHmac('sha256', signingKey)
+    .update(timestamp + token)
+    .digest('hex')
+
+  const expectedBuffer = Buffer.from(expected, 'utf8')
+  const receivedBuffer = Buffer.from(signature, 'utf8')
+  return expectedBuffer.length === receivedBuffer.length &&
+    timingSafeEqual(expectedBuffer, receivedBuffer)
+}
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData()
+    const timestamp = String(form.get('timestamp') || '')
+    const token = String(form.get('token') || '')
+    const signature = String(form.get('signature') || '')
 
-    const from = (form.get('sender') as string) || (form.get('from') as string)
-    const to = (form.get('recipient') as string) || (form.get('to') as string)
-    const subject = (form.get('subject') as string) || '(no subject)'
-    const body = (form.get('body-plain') as string) || ''
-    const htmlBody = (form.get('body-html') as string) || null
-    const messageId = (form.get('Message-Id') as string) || null
+    if (!isValidMailgunSignature(timestamp, token, signature)) {
+      return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 })
+    }
+
+    const from = String(form.get('sender') || form.get('from') || '')
+    const to = String(form.get('recipient') || form.get('to') || '')
+    const subject = String(form.get('subject') || '(no subject)')
+    const body = String(form.get('body-plain') || '')
+    const htmlBody = form.get('body-html') ? String(form.get('body-html')) : null
+    const messageId = form.get('Message-Id') ? String(form.get('Message-Id')) : null
 
     if (!from || !to) {
       return NextResponse.json({ error: 'Missing from/to' }, { status: 400 })
     }
 
-    // Extract local part and find user by inboxAddress
-    const localPart = to.split('@')[0].toLowerCase()
+    if (messageId) {
+      const existing = await prisma.email.findUnique({ where: { messageId } })
+      if (existing) return NextResponse.json({ ok: true, duplicate: true })
+    }
+
     const user = await prisma.user.findFirst({
-      where: {
-        inboxAddress: {
-          equals: to.toLowerCase(),
-          mode: 'insensitive',
-        },
-      },
+      where: { inboxAddress: { equals: to, mode: 'insensitive' } },
     })
 
-    if (!user) {
-      // Fallback: try matching just the local part if domain varies
-      const fallback = await prisma.user.findFirst({
-        where: {
-          inboxAddress: {
-            startsWith: localPart + '@',
-            mode: 'insensitive',
-          },
-        },
-      })
-      if (!fallback) {
-        return NextResponse.json({ ok: true, note: 'No matching user' })
-      }
-      await prisma.email.create({
-        data: {
-          userId: fallback.id,
-          from,
-          to,
-          subject,
-          body,
-          htmlBody,
-          messageId,
-          direction: 'inbound',
-        },
-      })
-      return NextResponse.json({ ok: true })
-    }
+    if (!user) return NextResponse.json({ ok: true, note: 'No matching user' })
 
     await prisma.email.create({
       data: {
@@ -71,8 +63,8 @@ export async function POST(req: Request) {
     })
 
     return NextResponse.json({ ok: true })
-  } catch (e) {
-    console.error('Mailgun webhook error', e)
-    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+  } catch (error) {
+    console.error('Mailgun webhook error', error)
+    return NextResponse.json({ error: 'Failed to process webhook' }, { status: 500 })
   }
 }
