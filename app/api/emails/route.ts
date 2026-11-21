@@ -11,7 +11,7 @@ export async function GET() {
 
   const emails = await prisma.email.findMany({
     where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { receivedAt: 'desc' },
     take: 50,
   })
 

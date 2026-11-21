@@ -1,12 +1,16 @@
+import { stripHtmlToPlainText } from '@/lib/strip-html'
+
+function jobDescription(raw: string): string {
+  return stripHtmlToPlainText(raw || '')
+}
+
 // Known Nigerian tech companies that use public ATS boards
-// Add more as you discover their board slugs
 export const NIGERIAN_TECH_ATS = [
   { company: 'Moniepoint', ats: 'greenhouse', slug: 'moniepoint' },
   { company: 'Flutterwave', ats: 'greenhouse', slug: 'flutterwave' },
   { company: 'Andela', ats: 'greenhouse', slug: 'andela' },
   { company: 'Paystack', ats: 'lever', slug: 'paystack' },
   { company: 'PiggyVest', ats: 'greenhouse', slug: 'piggyvest' },
-  // Add more here
 ] as const
 
 export type JobSource = {
@@ -25,7 +29,7 @@ export async function fetchRemotiveJobs(search = 'software'): Promise<JobSource[
   try {
     const res = await fetch(
       `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(search)}&limit=20`,
-      { next: { revalidate: 3600 } } // cache 1 hour
+      { next: { revalidate: 3600 } }
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -34,7 +38,7 @@ export async function fetchRemotiveJobs(search = 'software'): Promise<JobSource[
       title: j.title,
       company: j.company_name,
       location: j.candidate_required_location || 'Remote',
-      description: j.description || '',
+      description: jobDescription(j.description),
       url: j.url,
       source: 'remotive',
       remote: true,
@@ -66,15 +70,17 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
 
       if (board.ats === 'greenhouse') {
         for (const j of data.jobs || []) {
+          const locName = j.location?.name || 'Nigeria'
+          const locLower = locName.toLowerCase()
           jobs.push({
             id: `gh-${board.slug}-${j.id}`,
             title: j.title,
             company: board.company,
-            location: j.location?.name || 'Nigeria',
-            description: j.content || '',
+            location: locName,
+            description: jobDescription(j.content),
             url: j.absolute_url,
             source: 'greenhouse',
-            remote: false,
+            remote: locLower.includes('remote') || locLower.includes('anywhere'),
           })
         }
       } else if (board.ats === 'lever') {
@@ -84,7 +90,7 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
             title: j.text,
             company: board.company,
             location: j.categories?.location || 'Nigeria',
-            description: j.descriptionPlain || '',
+            description: jobDescription(j.descriptionPlain || j.description),
             url: j.hostedUrl,
             source: 'lever',
             remote: j.workplaceType === 'remote',
@@ -116,7 +122,6 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
     if (!res.ok) return []
     const data = await res.json()
 
-    // Filter to tech-ish roles
     const techKeywords = ['engineer', 'developer', 'software', 'tech', 'it ', 'data', 'devops', 'frontend', 'backend', 'fullstack']
     return (data.jobs || data.results || [])
       .filter((j: any) => {
@@ -128,7 +133,7 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
         title: j.title,
         company: j.company || j.companyName || 'Unknown',
         location: j.location || j.city || 'Nigeria',
-        description: j.description || '',
+        description: jobDescription(j.description),
         url: j.url || j.applyUrl || '#',
         source: 'techmap',
         remote: (j.workPlace || '').toLowerCase().includes('remote'),
@@ -140,38 +145,16 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
   }
 }
 
-export function scoreJob(job: JobSource, resumeText: string): number {
-  if (!resumeText || resumeText.length < 20) return 50
-
-  const resume = resumeText.toLowerCase()
-  const jobText = `${job.title} ${job.description}`.toLowerCase()
-
-  // Simple keyword overlap
-  const keywords = [
-    'react', 'next', 'node', 'typescript', 'javascript', 'python', 'java',
-    'aws', 'docker', 'kubernetes', 'sql', 'postgres', 'mongodb',
-    'frontend', 'backend', 'fullstack', 'devops', 'data', 'ml', 'ai',
-    'engineer', 'developer', 'software', 'senior', 'lead', 'manager',
-  ]
-
-  let matches = 0
-  for (const kw of keywords) {
-    if (resume.includes(kw) && jobText.includes(kw)) matches++
-  }
-
-  // Base + overlap bonus, capped
-  const score = Math.min(95, 40 + matches * 8)
-  return score
-}
+export async function fetchAllJobs(techmapKey?: string): Promise<JobSource[]> {
   const [remotive, ats, techmap] = await Promise.all([
     fetchRemotiveJobs('software engineer'),
     fetchATSJobs(),
     fetchTechmapJobs(techmapKey),
   ])
 
-  // Deduplicate roughly by title+company
   const seen = new Set<string>()
   const all = [...remotive, ...ats, ...techmap]
+
   return all.filter(j => {
     const key = `${j.title.toLowerCase()}-${j.company.toLowerCase()}`
     if (seen.has(key)) return false

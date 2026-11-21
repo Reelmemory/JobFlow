@@ -28,5 +28,5 @@ See `PROJECT.md` for the full plan, schema, and roadmap.
 - Next.js 15 + Tailwind
 - Neon + Prisma
 - Clerk (auth)
-- OpenAI
+- xAI Grok (OpenAI-compatible API)
 - Mailgun (inbox)

@@ -24,7 +24,7 @@ export function StatusSelect({ id, current }: { id: string; current: string }) {
       value={status}
       onChange={e => update(e.target.value)}
       disabled={saving}
-      className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm capitalize border-0 cursor-pointer"
+      className="w-full sm:w-auto min-h-[2.25rem] px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm capitalize border-0 cursor-pointer"
     >
       {STATUSES.map(s => (
         <option key={s} value={s}>{s}</option>

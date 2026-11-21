@@ -27,8 +27,9 @@ model Profile {
   id          String   @id @default(cuid())
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resumeText  String?  @db.Text
-  resumeUrl   String?
+  resumeText       String?  @db.Text
+  resumeUrl        String?
+  resumeFileName   String?
   targetRoles String[]
   locations   String[]
   salaryFloor Int?
@@ -67,6 +68,7 @@ model Application {
   appliedAt   DateTime @default(now())
   notes       String?
   source      String?
+  applyEmail  String?
 
   emails      Email[]
 }

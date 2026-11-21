@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
-import formData from 'form-data'
-import Mailgun from 'mailgun.js'
+import { getMailgunClient } from '@/lib/mailgun'
 
 export async function POST(req: Request) {
   const { userId } = await auth()
@@ -19,15 +18,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No inbox address set' }, { status: 400 })
   }
 
-  const apiKey = process.env.MAILGUN_API_KEY
   const domain = process.env.MAILGUN_DOMAIN
-  if (!apiKey || !domain) {
+  const client = getMailgunClient()
+  if (!client || !domain) {
     return NextResponse.json({ error: 'Mailgun not configured' }, { status: 500 })
   }
 
   try {
-    const mg = new Mailgun(formData)
-    const client = mg.client({ username: 'api', key: apiKey })
 
     await client.messages.create(domain, {
       from: user.inboxAddress,

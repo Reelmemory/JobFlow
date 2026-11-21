@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: system-ui, -apple-system, sans-serif;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
 }

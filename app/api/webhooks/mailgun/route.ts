@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { detectOtp } from '@/lib/mailgun'
+import { linkInboundToApplication } from '@/lib/inbox'
 
-// Mailgun inbound webhook
-// Configure in Mailgun: Routes → store and notify → POST to /api/webhooks/mailgun
 export async function POST(req: Request) {
   try {
     const form = await req.formData()
@@ -18,9 +18,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing from/to' }, { status: 400 })
     }
 
-    // Extract local part and find user by inboxAddress
     const localPart = to.split('@')[0].toLowerCase()
-    const user = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: {
         inboxAddress: {
           equals: to.toLowerCase(),
@@ -30,8 +29,7 @@ export async function POST(req: Request) {
     })
 
     if (!user) {
-      // Fallback: try matching just the local part if domain varies
-      const fallback = await prisma.user.findFirst({
+      user = await prisma.user.findFirst({
         where: {
           inboxAddress: {
             startsWith: localPart + '@',
@@ -39,27 +37,24 @@ export async function POST(req: Request) {
           },
         },
       })
-      if (!fallback) {
-        return NextResponse.json({ ok: true, note: 'No matching user' })
-      }
-      await prisma.email.create({
-        data: {
-          userId: fallback.id,
-          from,
-          to,
-          subject,
-          body,
-          htmlBody,
-          messageId,
-          direction: 'inbound',
-        },
-      })
-      return NextResponse.json({ ok: true })
     }
+
+    if (!user) {
+      return NextResponse.json({ ok: true, note: 'No matching user' })
+    }
+
+    const applicationId = await linkInboundToApplication({
+      userId: user.id,
+      from,
+      subject,
+    })
+
+    const isOtp = detectOtp(subject, body)
 
     await prisma.email.create({
       data: {
         userId: user.id,
+        applicationId,
         from,
         to,
         subject,
@@ -67,10 +62,18 @@ export async function POST(req: Request) {
         htmlBody,
         messageId,
         direction: 'inbound',
+        isOtp,
       },
     })
 
-    return NextResponse.json({ ok: true })
+    if (applicationId && isOtp) {
+      await prisma.application.updateMany({
+        where: { id: applicationId, status: 'applied' },
+        data: { status: 'viewed' },
+      })
+    }
+
+    return NextResponse.json({ ok: true, applicationId, isOtp })
   } catch (e) {
     console.error('Mailgun webhook error', e)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
