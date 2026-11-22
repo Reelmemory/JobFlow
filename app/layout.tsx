@@ -1,10 +1,17 @@
 import type { Metadata, Viewport } from 'next'
+import { Outfit } from 'next/font/google'
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 
+const outfit = Outfit({
+  subsets: ['latin'],
+  variable: '--font-outfit',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
-  title: 'JobFlow — AI Job Applications',
-  description: 'Find matches, tailor applications, track everything, and manage recruiter replies in one place.',
+  title: 'JobFlow',
+  description: 'Match roles, send applications, and keep recruiter replies in one place.',
 }
 
 export const viewport: Viewport = {
@@ -19,17 +26,20 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider
-      signInForceRedirectUrl="/dashboard"
-      signUpForceRedirectUrl="/dashboard"
-      signInFallbackRedirectUrl="/dashboard"
-      signUpFallbackRedirectUrl="/dashboard"
-    >
-      <html lang="en">
-        <body className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900 antialiased">
+    <html lang="en" className={outfit.variable} suppressHydrationWarning>
+      <body
+        className="min-h-screen overflow-x-hidden bg-slate-50 font-sans text-slate-900 antialiased"
+        suppressHydrationWarning
+      >
+        <ClerkProvider
+          signInForceRedirectUrl="/dashboard"
+          signUpForceRedirectUrl="/dashboard"
+          signInFallbackRedirectUrl="/dashboard"
+          signUpFallbackRedirectUrl="/dashboard"
+        >
           {children}
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   )
 }

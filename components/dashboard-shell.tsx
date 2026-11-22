@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { UserButton } from '@clerk/nextjs'
+import { BrandMark } from '@/components/brand-mark'
 
 const nav = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -79,9 +80,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <Link href="/dashboard" className="text-lg font-bold text-blue-600">
-          JobFlow
-        </Link>
+        <BrandMark href="/dashboard" size="sm" onDark={false} />
         <div className="shrink-0">
           <UserButton />
         </div>
@@ -102,9 +101,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div className="mb-6 flex items-center justify-between md:block">
-          <Link href="/dashboard" className="text-xl font-bold text-blue-400">
-            JobFlow
-          </Link>
+          <BrandMark href="/dashboard" size="md" onDark />
           <button
             type="button"
             onClick={() => setMenuOpen(false)}

@@ -1,6 +1,8 @@
 import { SignIn } from '@clerk/nextjs'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import { AuthFrame } from '@/components/auth-frame'
+import { clerkAuthAppearance } from '@/lib/clerk-appearance'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,10 +11,8 @@ export default async function SignInPage() {
   if (userId) redirect('/dashboard')
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
-      <div className="w-full max-w-[100%] sm:max-w-md [&_.cl-rootBox]:mx-auto">
-        <SignIn routing="path" path="/sign-in" />
-      </div>
-    </div>
+    <AuthFrame mode="signin">
+      <SignIn routing="path" path="/sign-in" appearance={clerkAuthAppearance} />
+    </AuthFrame>
   )
 }
