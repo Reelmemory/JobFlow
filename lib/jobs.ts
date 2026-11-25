@@ -1,3 +1,4 @@
+import { fetchNigeriaJobs } from './nigeria-jobs'
 import { jobFingerprint } from './job-fingerprint'
 import { stripHtmlToPlainText } from '@/lib/strip-html'
 
@@ -5,13 +6,10 @@ function jobDescription(raw: string): string {
   return stripHtmlToPlainText(raw || '')
 }
 
-// Known Nigerian tech companies that use public ATS boards
-export const NIGERIAN_TECH_ATS = [
+// Public employer boards with Nigerian vacancies.
+const ATS_BOARDS = [
   { company: 'Moniepoint', ats: 'greenhouse', slug: 'moniepoint' },
-  { company: 'Flutterwave', ats: 'greenhouse', slug: 'flutterwave' },
-  { company: 'Andela', ats: 'greenhouse', slug: 'andela' },
-  { company: 'Paystack', ats: 'lever', slug: 'paystack' },
-  { company: 'PiggyVest', ats: 'greenhouse', slug: 'piggyvest' },
+  { company: 'Yassir', ats: 'lever', slug: 'Yassir' },
 ] as const
 
 export type JobSource = {
@@ -27,12 +25,12 @@ export type JobSource = {
   postedAt?: string
 }
 
-export async function fetchRemotiveJobs(search: string): Promise<JobSource[]> {
+export async function fetchRemotiveJobs(): Promise<JobSource[]> {
   try {
-    const res = await fetch(
-      `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(search)}&limit=20`,
-      { signal: AbortSignal.timeout(8000), cache: 'no-store' },
-    )
+    const res = await fetch('https://remotive.com/api/remote-jobs?limit=150', {
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 21600 },
+    })
     if (!res.ok) return []
     const data = await res.json()
     return (data.jobs || []).map((j: any) => ({
@@ -56,7 +54,7 @@ export async function fetchRemotiveJobs(search: string): Promise<JobSource[]> {
 export async function fetchATSJobs(): Promise<JobSource[]> {
   const jobs: JobSource[] = []
 
-  for (const board of NIGERIAN_TECH_ATS) {
+  for (const board of ATS_BOARDS) {
     try {
       let url = ''
       if (board.ats === 'greenhouse') {
@@ -146,16 +144,17 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
   }
 }
 
-export async function fetchAllJobs(roles: string[], techmapKey?: string): Promise<JobSource[]> {
-  const [remotive, ats, techmap] = await Promise.all([
-    Promise.all(roles.map(fetchRemotiveJobs)),
+export async function fetchAllJobs(techmapKey?: string): Promise<JobSource[]> {
+  const [remotive, ats, techmap, nigeria] = await Promise.all([
+    fetchRemotiveJobs(),
     fetchATSJobs(),
     fetchTechmapJobs(techmapKey),
+    fetchNigeriaJobs(),
   ])
 
   const seen = new Set<string>()
   const urls = new Set<string>()
-  const all = [...ats, ...remotive.flat(), ...techmap]
+  const all = [...ats, ...nigeria, ...remotive, ...techmap]
 
   return all.filter((j) => {
     if (

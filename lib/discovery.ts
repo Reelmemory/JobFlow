@@ -22,8 +22,15 @@ export function assess(job: Listing, profile: Profile | null) {
     const core = terms.filter((w) => !['junior', 'entry', 'level', 'computing'].includes(w))
     return terms.length > 0 && (core.length ? core : terms).every((w) => title.includes(w))
   })
+  const relatedSupport =
+    !role &&
+    roles.some((r) => /\b(it support|help ?desk)\b/i.test(r)) &&
+    /\b(ict|it officer|it technician|desktop support|technical support|service desk)\b/i.test(
+      job.title,
+    ) &&
+    /\b(support|troubleshoot\w*|help ?desk)\b/i.test(job.description)
   if (
-    !role ||
+    (!role && !relatedSupport) ||
     profile?.blacklist.some((b) => job.company.toLowerCase().includes(b.toLowerCase())) ||
     (profile?.remoteOnly && !job.remote)
   )
@@ -40,7 +47,9 @@ export function assess(job: Listing, profile: Profile | null) {
       (location.includes(country.toLowerCase()) ||
         /^(worldwide|anywhere|global|worldwide remote)$/i.test(location))
     : locations.some((l) => l !== 'remote' && location.includes(l))
-  const reasons = []
+  const reasons: string[] = []
+  if (relatedSupport)
+    reasons.push('Related IT support duties. Review the title and responsibilities.')
   if (
     !locationFits ||
     /\b(?:excluding|except|outside|only)\b/i.test(location) ||
@@ -75,9 +84,8 @@ export function assess(job: Listing, profile: Profile | null) {
 }
 
 export async function discover(profile: Profile | null, clerkId?: string) {
-  const roles = profile?.targetRoles.length ? profile.targetRoles : DEFAULT_ROLES
   const fixture = sandboxListing(clerkId)
-  const listings = fixture ? [fixture] : await fetchAllJobs(roles, process.env.TECHMAP_RAPIDAPI_KEY)
+  const listings = fixture ? [fixture] : await fetchAllJobs(process.env.TECHMAP_RAPIDAPI_KEY)
   const matches = []
   for (const job of listings) {
     const fit = assess(job, profile)

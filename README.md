@@ -8,6 +8,8 @@ Use Node 22.20+ or 24, Next.js 16 App Router, Clerk and PostgreSQL. Copy `.env.e
 
 Upload a selectable-text PDF, DOCX or UTF-8 TXT up to 4,000,000 bytes in Profile. Save roles, locations, country of residence and years of relevant experience. Each upload creates a private immutable version in Neon. Old local-filesystem CVs require one re-upload to enable download and sending. Replacing a CV preserves previous drafts and the CV selected for Auto-Hunt.
 
+Discovery filters the MyJobMag Nigeria feed, Remotive and employer ATS listings against your saved preferences. Techmap is optional. Related support roles and uncertain location or experience requirements appear with a review reason and original link.
+
 Choose **Prepare draft** in Job Matches, then open **Applications** to inspect the letter, listing, address and attachment before sending. Under **Profile → Auto-Hunt**, choose a version and daily cap, then enable. The default cap is three. The scheduler starts at 07:00 UTC once daily, within Vercel's scheduling window. Pause at any time. Changes to saved preferences apply to future runs. Manual sends count toward that day's automatic allowance. The dashboard uses UTC for daily counts.
 
 ## Deployment

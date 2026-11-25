@@ -38,7 +38,7 @@ function setAppliedLocal(jobs: Job[], jobId: string) {
   return jobs.map((j) => (j.id === jobId ? { ...j, applied: true } : j))
 }
 
-type SourceFilter = 'all' | 'remotive' | 'greenhouse' | 'lever' | 'techmap'
+type SourceFilter = 'all' | 'remotive' | 'greenhouse' | 'lever' | 'techmap' | 'myjobmag'
 type RemoteFilter = 'all' | 'remote' | 'onsite'
 
 function matchColor(score: number) {
@@ -121,7 +121,7 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
         <div>
           <h1 className="text-2xl font-bold mb-2 sm:text-3xl">Job Matches</h1>
           <p className="text-slate-600 max-w-2xl text-sm sm:text-base">
-            Live listings from Remotive, Nigerian Greenhouse/Lever boards, and Techmap (if configured).
+            Live listings from MyJobMag Nigeria, Remotive, public Greenhouse/Lever boards, and Techmap (if configured).
             Scores use your profile resume, roles, and locations.
           </p>
         </div>
@@ -174,6 +174,7 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
             className="border rounded-lg px-3 py-1.5 text-sm w-full sm:w-auto min-w-[10rem]"
           >
             <option value="all">All sources</option>
+            <option value="myjobmag">MyJobMag Nigeria</option>
             <option value="remotive">Remotive</option>
             <option value="greenhouse">Greenhouse (NG)</option>
             <option value="lever">Lever (NG)</option>

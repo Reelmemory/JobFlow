@@ -169,6 +169,13 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
     .get('/api/remote-jobs')
     .query(true)
     .reply(200, { jobs: listings })
+  nock('https://www.myjobmag.com')
+    .persist()
+    .get('/feeds/ng/jobsxml_by_categories.xml')
+    .reply(
+      200,
+      '<rss><channel><item><position>Junior IT Support</position><company>Expired XML</company><link>https://training.test/closed</link><expiryDate>2020-01-01</expiryDate><description>Closed</description></item></channel></rss>',
+    )
   nock('https://boards-api.greenhouse.io').persist().get(/.*/).reply(200, { jobs: [] })
   nock('https://api.lever.co').persist().get(/.*/).reply(200, [])
   nock('https://fixture-ai.test')
@@ -294,7 +301,11 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
   assert.equal(await dispatch(a.id, second.id, true), 'Paused or needs review.')
   await prisma.application.update({
     where: { id: second.id },
-    data: { delivery: 'queued', attemptedAt: new Date(Date.now() - 120_000), attemptKey: 'uncertain' },
+    data: {
+      delivery: 'queued',
+      attemptedAt: new Date(Date.now() - 120_000),
+      attemptKey: 'uncertain',
+    },
   })
   nock('https://api.mailgun.net')
     .get('/v3/' + domain + '/events')

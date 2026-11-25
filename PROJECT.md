@@ -14,7 +14,7 @@ Unauthenticated browser automation initially stalled at Clerk's protect-check st
 
 ## Application lifecycle
 
-Discovery reads saved roles across Remotive and the existing Greenhouse, Lever and optional Techmap sources. It checks published expiry and closed-listing signals, deduplicates title and employer, and explains location and experience fit. An unspecified remote region, missing application address or uncertain requirement routes the application to review. Listings without a published closing date can disappear between discovery and submission.
+Discovery reads saved roles against the Nigerian MyJobMag XML feed, Remotive, Greenhouse, Lever and optional Techmap listings. Four obsolete ATS endpoints returned 404 during live verification. The active board list now uses Moniepoint and Yassir. A live smoke check returned HTTP 200 from all four public sources, 275 unique listings and two related roles under the starting preferences. Both needed review. A shared Remotive snapshot refreshes every six hours and each account filters it with its own preferences. It checks published expiry and closed-listing signals, deduplicates title and employer, and explains location and experience fit. An unspecified remote region, missing application address or uncertain requirement routes the application to review. Listings without a published closing date can disappear between discovery and submission.
 
 Grok receives extracted CV text and the listing. The response must include a letter, supporting CV excerpts and missing qualifications. The app checks quoted evidence against the CV. The model's assessment can still be wrong. Each draft pins its CV, source URL and listing revision. Only an explicitly published application address qualifies for sending.
 
