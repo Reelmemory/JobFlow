@@ -77,10 +77,30 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
   })
   execFileSync(
     process.execPath,
-    ['node_modules/prisma/build/index.js', 'db', 'push', '--skip-generate'],
+    [
+      'node_modules/prisma/build/index.js',
+      'db',
+      'push',
+      '--schema',
+      'tests/fixtures/legacy.prisma',
+      '--skip-generate',
+    ],
     { stdio: 'pipe' },
   )
-  console.log('Schema ready')
+  const legacy = pg.getPgClient('postgres', '127.0.0.1')
+  await legacy.connect()
+  try {
+    await legacy.query(
+      'INSERT INTO "User" (id,"clerkId",email,"updatedAt","autoHunt") VALUES (\'legacy\',\'legacy\',\'legacy@example.test\',NOW(),true)',
+    )
+    await legacy.query(await readFile('prisma/upgrade-auto-hunt.sql', 'utf8'))
+    const old = await legacy.query('SELECT * FROM "User" WHERE id=\'legacy\'')
+    assert.equal(old.rows[0].autoHunt, false)
+    assert.equal(old.rows[0].dailyQuota, 3)
+  } finally {
+    await legacy.end()
+  }
+  console.log('Legacy upgrade passed')
   const { prisma } = await import('../lib/prisma')
   disconnect = () => prisma.$disconnect()
   const { storeResume, downloadResume } = await import('../lib/resume-storage')
@@ -135,6 +155,14 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
       description: 'Email privacy@training.test about data protection.',
     },
   ]
+  listings.forEach((job) => {
+    job.url += '/' + job.id
+  })
+  listings.push({
+    ...listings[0],
+    title: 'Junior IT Support (copy)',
+    url: listings[0].url + '?utm_source=feed',
+  })
   nock.disableNetConnect()
   nock('https://remotive.com')
     .persist()
@@ -146,8 +174,8 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
   nock('https://fixture-ai.test')
     .persist()
     .post('/v1/chat/completions')
-    .reply(200, (_uri: string, input: unknown) => {
-      assert.ok(JSON.stringify(input).includes(evidence))
+    .reply(200, async (request: Request) => {
+      assert.ok((await request.text()).includes(evidence))
       return {
         choices: [
           {
@@ -168,13 +196,10 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
   nock('https://api.mailgun.net')
     .persist()
     .post('/v3/' + domain + '/messages')
-    .reply(function (_uri: string, body: unknown) {
-      const payload = Buffer.isBuffer(body)
-        ? body
-        : Buffer.from(String(body), /^[0-9a-f]+$/i.test(String(body)) ? 'hex' : 'utf8')
-      sentBody = Buffer.from(payload)
+    .reply(200, async (request: Request) => {
+      sentBody = Buffer.from(await request.arrayBuffer())
       sends++
-      return [200, { id: '<accepted-' + sends + '@' + domain + '>', message: 'Queued' }]
+      return { id: '<accepted-' + sends + '@' + domain + '>', message: 'Queued' }
     })
   const tick = () =>
     cron(
@@ -240,7 +265,9 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
   assert.equal((await reply()).status, 200)
   await reply()
   assert.equal(
-    await prisma.email.count({ where: { userId: a.id, applicationId: submitted.id } }),
+    await prisma.email.count({
+      where: { userId: a.id, applicationId: submitted.id, direction: 'inbound' },
+    }),
     1,
   )
   assert.equal(await prisma.email.count({ where: { userId: b.id } }), 0)
@@ -279,4 +306,29 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
     'submitted',
   )
   assert.equal(sends, 1)
+  const manual = apps.find((app) => app.company === 'Unclear')!
+  nock.cleanAll()
+  nock('https://api.mailgun.net')
+    .post('/v3/' + domain + '/messages')
+    .reply(403, { message: 'Recipient rejected' })
+  assert.equal(await dispatch(a.id, manual.id, false), 'Provider rejected the send.')
+  const failed = await prisma.application.findUniqueOrThrow({ where: { id: manual.id } })
+  assert.equal(failed.delivery, 'failed')
+  assert.equal(failed.submittedAt, null)
+  nock('https://api.mailgun.net')
+    .get('/v3/' + domain + '/events')
+    .query(true)
+    .reply(200, { items: [], paging: {} })
+  nock('https://api.mailgun.net')
+    .post('/v3/' + domain + '/messages')
+    .reply(200, { id: '<manual@test>', message: 'Queued' })
+  await Promise.all([dispatch(a.id, manual.id, false), dispatch(a.id, manual.id, false)])
+  assert.equal(
+    (await prisma.application.findUniqueOrThrow({ where: { id: manual.id } })).delivery,
+    'submitted',
+  )
+  assert.equal(
+    await prisma.email.count({ where: { applicationId: manual.id, direction: 'outbound' } }),
+    1,
+  )
 })

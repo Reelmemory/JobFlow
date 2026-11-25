@@ -4,7 +4,7 @@ JobFlow discovers roles using your profile, drafts letters with Grok and sends e
 
 ## Run locally
 
-Use Node 22.13+ or 24, Next.js 16 App Router, Clerk and PostgreSQL. Copy `.env.example` to `.env` and configure a development database and Clerk instance. Run `npm ci`, `npx prisma generate`, `npm run db:push` on the **new database**, then `npm run dev`. Existing production installations use the upgrade below.
+Use Node 22.20+ or 24, Next.js 16 App Router, Clerk and PostgreSQL. Copy `.env.example` to `.env` and configure a development database and Clerk instance. Run `npm ci`, `npx prisma generate`, `npm run db:push` on the **new database**, then `npm run dev`. Existing production installations use the upgrade below.
 
 Upload a selectable-text PDF, DOCX or UTF-8 TXT up to 4,000,000 bytes in Profile. Save roles, locations, country of residence and years of relevant experience. Each upload creates a private immutable version in Neon. Old local-filesystem CVs require one re-upload to enable download and sending. Replacing a CV preserves previous drafts and the CV selected for Auto-Hunt.
 
@@ -35,7 +35,7 @@ Add a dedicated subdomain such as `jobs.<your-guidepost-domain>` in the selected
 | Sending subdomain | MX, priority 10 | US: `mxa.mailgun.org` and `mxb.mailgun.org`. EU: `mxa.eu.mailgun.org` and `mxb.eu.mailgun.org` |
 | Tracking hostname from Mailgun, if enabled | CNAME | Mailgun's displayed regional tracking target |
 
-Verify the domain and both MX records in Mailgun. Change the route expression and webhooks for this domain. Set production `MAILGUN_DOMAIN`, regional API credentials and signing key. After a successful sandbox acceptance and reply, set production `MAIL_MODE=live`, redeploy, choose the CV and cap, and enable Auto-Hunt in **your own account**. Live sending is disabled in Vercel previews. [Domain verification](https://documentation.mailgun.com/docs/mailgun/user-manual/domains/domains-verify)
+Verify the domain and both MX records in Mailgun. Change the route expression and webhooks for this domain. Set production `MAILGUN_DOMAIN`, regional API credentials and signing key. After a successful sandbox acceptance and reply, set production `MAIL_MODE=live`, redeploy, choose the CV and cap, and enable Auto-Hunt in **your own account**. Live sending requires a Vercel production deployment. [Domain verification](https://documentation.mailgun.com/docs/mailgun/user-manual/domains/domains-verify)
 
 ## Verification
 

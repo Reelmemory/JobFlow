@@ -19,6 +19,7 @@ ADD COLUMN     "attemptedAt" TIMESTAMP(3),
 ADD COLUMN     "delivery" TEXT NOT NULL DEFAULT 'draft',
 ADD COLUMN     "failedAt" TIMESTAMP(3),
 ADD COLUMN     "fingerprint" TEXT,
+ADD COLUMN     "listingVersion" TEXT,
 ADD COLUMN     "jobUrl" TEXT,
 ADD COLUMN     "providerId" TEXT,
 ADD COLUMN     "resumeId" TEXT,
@@ -63,5 +64,5 @@ ALTER TABLE "Resume" ADD CONSTRAINT "Resume_userId_fkey" FOREIGN KEY ("userId") 
 UPDATE "Application" a SET delivery = 'submitted', "submittedAt" = a."appliedAt"
 WHERE EXISTS (SELECT 1 FROM "Email" e WHERE e."userId" = a."userId" AND e."applicationId" = a.id AND e.direction = 'outbound');
 UPDATE "Application" SET "reviewReason" = 'Historical application. Verify submission and upload a versioned CV before reusing it.' WHERE delivery = 'draft';
-UPDATE "User" SET "autoHunt" = false, "dailyQuota" = 3 WHERE "huntResumeId" IS NULL AND "dailyQuota" = 15;
+UPDATE "User" SET "autoHunt" = false, "dailyQuota" = CASE WHEN "dailyQuota" = 15 THEN 3 ELSE "dailyQuota" END WHERE "huntResumeId" IS NULL;
 COMMIT;

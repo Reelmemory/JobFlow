@@ -1,3 +1,4 @@
+import { jobFingerprint } from './job-fingerprint'
 import { stripHtmlToPlainText } from '@/lib/strip-html'
 
 function jobDescription(raw: string): string {
@@ -30,7 +31,7 @@ export async function fetchRemotiveJobs(search: string): Promise<JobSource[]> {
   try {
     const res = await fetch(
       `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(search)}&limit=20`,
-      { signal: AbortSignal.timeout(8000), cache: 'no-store' }
+      { signal: AbortSignal.timeout(8000), cache: 'no-store' },
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -43,7 +44,8 @@ export async function fetchRemotiveJobs(search: string): Promise<JobSource[]> {
       url: j.url,
       source: 'remotive',
       remote: true,
-      postedAt: j.publication_date, expiresAt: j.expiration_date || j.validThrough,
+      postedAt: j.publication_date,
+      expiresAt: j.expiration_date || j.validThrough,
     }))
   } catch (e) {
     console.error('Remotive error', e)
@@ -79,7 +81,8 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
             company: board.company,
             location: locName,
             description: jobDescription(j.content),
-            url: j.absolute_url, expiresAt: j.validThrough || j.expires_at,
+            url: j.absolute_url,
+            expiresAt: j.validThrough || j.expires_at,
             source: 'greenhouse',
             remote: locLower.includes('remote') || locLower.includes('anywhere'),
           })
@@ -92,7 +95,8 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
             company: board.company,
             location: j.categories?.location || 'Unknown',
             description: jobDescription(j.descriptionPlain || j.description),
-            url: j.hostedUrl, expiresAt: j.validThrough || j.expiresAt,
+            url: j.hostedUrl,
+            expiresAt: j.validThrough || j.expiresAt,
             source: 'lever',
             remote: j.workplaceType === 'remote',
           })
@@ -117,24 +121,25 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
           'X-RapidAPI-Key': apiKey,
           'X-RapidAPI-Host': 'daily-international-job-postings.p.rapidapi.com',
         },
-        signal: AbortSignal.timeout(8000), cache: 'no-store',
-      }
+        signal: AbortSignal.timeout(8000),
+        cache: 'no-store',
+      },
     )
     if (!res.ok) return []
     const data = await res.json()
 
     return (data.jobs || data.results || []).map((j: any) => ({
-        id: `techmap-${j.id || j.jobId}`,
-        title: j.title,
-        company: j.company || j.companyName || 'Unknown',
-        location: j.location || j.city || 'Unknown',
-        description: jobDescription(j.description),
-        url: j.url || j.applyUrl || '#',
-        source: 'techmap',
-        remote: (j.workPlace || '').toLowerCase().includes('remote'),
-        expiresAt: j.validThrough || j.expiresAt,
-        postedAt: j.dateCreated || j.postedAt,
-      }))
+      id: `techmap-${j.id || j.jobId}`,
+      title: j.title,
+      company: j.company || j.companyName || 'Unknown',
+      location: j.location || j.city || 'Unknown',
+      description: jobDescription(j.description),
+      url: j.url || j.applyUrl || '#',
+      source: 'techmap',
+      remote: (j.workPlace || '').toLowerCase().includes('remote'),
+      expiresAt: j.validThrough || j.expiresAt,
+      postedAt: j.dateCreated || j.postedAt,
+    }))
   } catch (e) {
     console.error('Techmap error', e)
     return []
@@ -149,12 +154,26 @@ export async function fetchAllJobs(roles: string[], techmapKey?: string): Promis
   ])
 
   const seen = new Set<string>()
-  const all = [...remotive.flat(), ...ats, ...techmap]
+  const urls = new Set<string>()
+  const all = [...ats, ...remotive.flat(), ...techmap]
 
-  return all.filter(j => {
-    if (!j.title || !j.company || !/^https?:\/\//i.test(j.url) || (j.expiresAt && !(Date.parse(j.expiresAt) > Date.now())) || /(?:applications (?:are )?closed|no longer accepting applications)/i.test(j.description)) return false
-    const key = `${j.title.trim().toLowerCase()}-${j.company.trim().toLowerCase()}`
-    if (seen.has(key)) return false
+  return all.filter((j) => {
+    if (
+      !j.title ||
+      !j.company ||
+      !/^https?:\/\//i.test(j.url) ||
+      (j.expiresAt && !(Date.parse(j.expiresAt) > Date.now())) ||
+      /(?:applications (?:are )?closed|no longer accepting applications)/i.test(j.description)
+    )
+      return false
+    const url = URL.parse(j.url)
+    if (!url) return false
+    url.hash = ''
+    for (const name of [...url.searchParams.keys()])
+      if (name.startsWith('utm_')) url.searchParams.delete(name)
+    const key = jobFingerprint(j.title, j.company)
+    if (seen.has(key) || urls.has(url.href)) return false
+    urls.add(url.href)
     seen.add(key)
     return true
   })

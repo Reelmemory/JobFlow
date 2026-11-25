@@ -17,11 +17,11 @@ const words = (text: string): string[] =>
 export function assess(job: Listing, profile: Profile | null) {
   const roles = profile?.targetRoles.length ? profile.targetRoles : DEFAULT_ROLES
   const title = words(job.title)
-  const role = roles.find((r) =>
-    words(r)
-      .filter((w) => !['junior', 'entry', 'level', 'computing'].includes(w))
-      .every((w) => title.includes(w)),
-  )
+  const role = roles.find((r) => {
+    const terms = words(r)
+    const core = terms.filter((w) => !['junior', 'entry', 'level', 'computing'].includes(w))
+    return terms.length > 0 && (core.length ? core : terms).every((w) => title.includes(w))
+  })
   if (
     !role ||
     profile?.blacklist.some((b) => job.company.toLowerCase().includes(b.toLowerCase())) ||
@@ -34,7 +34,9 @@ export function assess(job: Listing, profile: Profile | null) {
     l.toLowerCase(),
   )
   const locationFits = job.remote
-    ? locations.includes('remote') &&
+    ? (profile?.remoteOnly ||
+        locations.includes('remote') ||
+        locations.includes(country.toLowerCase())) &&
       (location.includes(country.toLowerCase()) ||
         /^(worldwide|anywhere|global|worldwide remote)$/i.test(location))
     : locations.some((l) => l !== 'remote' && location.includes(l))

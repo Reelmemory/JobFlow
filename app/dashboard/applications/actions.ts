@@ -14,8 +14,12 @@ export async function applicationAction(form: FormData) {
     where: { id: String(form.get('id')), userId: user.id },
   })
   let message = 'Draft updated.'
-  if (form.get('action') === 'prepare' && app.jobId) await prepareDraft(user.id, app.jobId)
-  else message = (await dispatch(user.id, app.id, false)) || 'Review application.'
+  if (form.get('action') === 'prepare' && app.jobId)
+    await prepareDraft(user.id, app.jobId, false, true)
+  else
+    message =
+      (await dispatch(user.id, app.id, false, String(form.get('reviewed') || 'unreviewed'))) ||
+      'Review application.'
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/applications')
   redirect('/dashboard/applications?message=' + encodeURIComponent(message) + '#app-' + app.id)

@@ -1,3 +1,4 @@
+import { listingVersion, reviewVersion } from './listing-version'
 import { sandboxListing } from './sandbox-listing'
 import { randomUUID } from 'node:crypto'
 import { prisma } from './prisma'
@@ -24,15 +25,34 @@ export async function recordOutcome(attempt: string, event: string, providerId?:
   const from = event === 'accepted' ? ['queued'] : ['queued', 'submitted', 'deferred']
   const app = await prisma.application.findUnique({ where: { attemptKey: attempt } })
   if (!app) return
-  await prisma.application.updateMany({
-    where: { id: app.id, attemptKey: attempt, delivery: { in: from } },
-    data: {
-      delivery,
-      submittedAt: app.submittedAt || app.attemptedAt || new Date(),
-      providerId: providerId || undefined,
-      failedAt: delivery === 'bounced' ? new Date() : undefined,
-      status: 'applied',
-    },
+  await prisma.$transaction(async (tx) => {
+    const changed = await tx.application.updateMany({
+      where: { id: app.id, attemptKey: attempt, delivery: { in: from } },
+      data: {
+        delivery,
+        submittedAt: app.submittedAt || app.attemptedAt || new Date(),
+        providerId: providerId || undefined,
+        failedAt: delivery === 'bounced' ? new Date() : undefined,
+        status: app.submittedAt ? undefined : 'applied',
+      },
+    })
+    if (changed.count)
+      await tx.email.createMany({
+        skipDuplicates: true,
+        data: [
+          {
+            userId: app.userId,
+            applicationId: app.id,
+            direction: 'outbound',
+            isRead: true,
+            messageId: 'application-send:' + attempt,
+            from: 'applications@' + mailgunDomain(),
+            to: app.applyEmail,
+            subject: 'Application for ' + app.title,
+            body: app.coverLetter,
+          },
+        ],
+      })
   })
 }
 
@@ -54,7 +74,7 @@ export async function reconcile(attempt: string) {
   }
 }
 
-export async function dispatch(userId: string, id: string, automatic: boolean) {
+export async function dispatch(userId: string, id: string, automatic: boolean, reviewed?: string) {
   const claim = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`
     const user = await tx.user.findUniqueOrThrow({
@@ -76,6 +96,10 @@ export async function dispatch(userId: string, id: string, automatic: boolean) {
       return {
         message: 'Review the CV, draft, application address and mail configuration.',
       } as const
+    if (reviewed && reviewed !== reviewVersion(app))
+      return { message: 'The draft changed. Review its latest letter and CV.' } as const
+    if (listingVersion(app.job) !== app.listingVersion)
+      return { message: 'The listing changed. Prepare the letter again.' } as const
     if (app.job.expiresAt && app.job.expiresAt <= new Date())
       return { message: 'Listing has expired.' } as const
     if (app.job.source === 'sandbox' && !sandboxListing(user.clerkId))

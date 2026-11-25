@@ -25,9 +25,14 @@ export async function runHunt() {
     try {
       const matches = await discover(user.profile, user.clerkId)
       for (const job of matches) {
-        const app = await prepareDraft(user.id, job.id, true)
-        if (!app.reviewReason && app.delivery !== 'queued') await dispatch(user.id, app.id, true)
-        processed++
+        try {
+          const app = await prepareDraft(user.id, job.id, true)
+          if (!app.reviewReason && ['draft', 'failed'].includes(app.delivery))
+            await dispatch(user.id, app.id, true)
+          processed++
+        } catch {
+          errors++
+        }
       }
     } catch {
       errors++

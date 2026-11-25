@@ -19,87 +19,90 @@ model User {
   updatedAt    DateTime @updatedAt
 
   huntResumeId String?
-  resumes Resume[]
+  resumes      Resume[]
   profile      Profile?
   applications Application[]
   emails       Email[]
 }
 
 model Profile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   currentResumeId String?
-  country String @default("Nigeria")
-  experienceYears Int @default(0)
-  resumeText       String?  @db.Text
-  resumeUrl        String?
-  resumeFileName   String?
-  targetRoles String[]
-  locations   String[]
-  salaryFloor Int?
-  remoteOnly  Boolean  @default(false)
-  blacklist   String[]
-  skills      String[]
-  updatedAt   DateTime @updatedAt
+  country         String   @default("Nigeria")
+  experienceYears Int      @default(0)
+  resumeText      String?  @db.Text
+  resumeUrl       String?
+  resumeFileName  String?
+  targetRoles     String[]
+  locations       String[]
+  salaryFloor     Int?
+  remoteOnly      Boolean  @default(false)
+  blacklist       String[]
+  skills          String[]
+  updatedAt       DateTime @updatedAt
 }
 
 model Resume {
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  filename String
-  text String @db.Text
-  bytes Bytes
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename  String
+  text      String   @db.Text
+  bytes     Bytes
   createdAt DateTime @default(now())
+
   @@index([userId, createdAt])
 }
 
 model Job {
-  fingerprint String? @unique
-  remote Boolean @default(false)
-  expiresAt DateTime?
-  id          String   @id @default(cuid())
+  fingerprint String?   @unique
+  remote      Boolean   @default(false)
+  expiresAt   DateTime?
+  id          String    @id @default(cuid())
   externalId  String?
   title       String
   company     String
   location    String
-  description String   @db.Text
+  description String    @db.Text
   url         String
   source      String
   postedAt    DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   applications Application[]
 }
 
 model Application {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobId       String?
-  job         Job?     @relation(fields: [jobId], references: [id])
-  title       String
-  company     String
-  status      String   @default("draft")
-  fingerprint String?
-  jobUrl String?
-  resumeId String?
-  reviewReason String?
-  delivery String @default("draft")
-  attemptedAt DateTime?
-  submittedAt DateTime?
-  failedAt DateTime?
-  providerId String? @unique
-  attemptKey String? @unique
-  coverLetter String   @db.Text
-  matchScore  Int?
-  appliedAt   DateTime @default(now())
-  notes       String?
-  source      String?
-  applyEmail  String?
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId          String?
+  job            Job?      @relation(fields: [jobId], references: [id])
+  title          String
+  company        String
+  status         String    @default("draft")
+  fingerprint    String?
+  listingVersion String?
+  jobUrl         String?
+  resumeId       String?
+  reviewReason   String?
+  delivery       String    @default("draft")
+  attemptedAt    DateTime?
+  submittedAt    DateTime?
+  failedAt       DateTime?
+  providerId     String?   @unique
+  attemptKey     String?   @unique
+  coverLetter    String    @db.Text
+  matchScore     Int?
+  appliedAt      DateTime  @default(now())
+  notes          String?
+  source         String?
+  applyEmail     String?
 
-  emails      Email[]
+  emails Email[]
+
   @@unique([userId, fingerprint])
   @@index([userId, attemptedAt])
 }

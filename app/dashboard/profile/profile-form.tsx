@@ -52,10 +52,10 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
         if (data.profile.locations?.length) {
           setLocations(data.profile.locations.join(', '))
         }
-        if (data.profile.skills?.length) setSkills(data.profile.skills)
+        setSkills(data.profile.skills)
       }
       setMessage(
-        'Resume uploaded. We extracted your experience for matching and cover letters. Review roles and locations below, then save if you changed them.',
+        'Resume uploaded. Review your extracted text and save any changes to your preferences.',
       )
     } catch {
       setError('Network error while uploading')

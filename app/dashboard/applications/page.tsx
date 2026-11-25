@@ -1,3 +1,4 @@
+import { reviewVersion } from '@/lib/listing-version'
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
@@ -47,7 +48,7 @@ export default async function ApplicationsPage({
           {a.applyEmail && <p className="text-sm">Application address · {a.applyEmail}</p>}
           <div className="flex gap-4 text-sm text-blue-700 underline">
             {(a.jobUrl || a.notes)?.match(/^https?:\/\//i) && (
-              <a href={(a.jobUrl || a.notes)!} target="_blank" rel="noreferrer">
+              <a href={a.jobUrl || a.notes || undefined} target="_blank" rel="noreferrer">
                 Original listing
               </a>
             )}
@@ -64,9 +65,10 @@ export default async function ApplicationsPage({
           {a.submittedAt && <StatusSelect id={a.id} current={a.status} />}
           <form action={applicationAction}>
             <input type="hidden" name="id" value={a.id} />
-            {!a.coverLetter && a.jobId && (
+            <input type="hidden" name="reviewed" value={reviewVersion(a)} />
+            {a.delivery === 'draft' && a.jobId && (
               <button className="text-blue-700 underline" name="action" value="prepare">
-                Prepare letter again
+                Prepare letter with current CV
               </button>
             )}
             {a.coverLetter &&

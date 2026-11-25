@@ -1,9 +1,15 @@
+import { listingVersion } from './listing-version'
 import { sandboxListing } from './sandbox-listing'
 import { prisma } from './prisma'
 import { assess } from './discovery'
 import { generateCoverLetter } from './ai'
 
-export async function prepareDraft(userId: string, jobId: string, automatic = false) {
+export async function prepareDraft(
+  userId: string,
+  jobId: string,
+  automatic = false,
+  regenerate = false,
+) {
   const [user, job] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { profile: true } }),
     prisma.job.findUniqueOrThrow({ where: { id: jobId } }),
@@ -24,10 +30,24 @@ export async function prepareDraft(userId: string, jobId: string, automatic = fa
       ],
     },
   })
-  if (previous && (previous.coverLetter || previous.delivery !== 'draft' || !previous.fingerprint))
-    return previous
+  const version = listingVersion(job)
   const fit = assess(job, user.profile)
   const resumeId = automatic ? user.huntResumeId : user.profile?.currentResumeId
+  if (previous) {
+    if (
+      previous.delivery !== 'draft' ||
+      !previous.fingerprint ||
+      (automatic && previous.source === 'manual')
+    )
+      return previous
+    if (
+      !regenerate &&
+      previous.coverLetter &&
+      previous.listingVersion === version &&
+      (!automatic || previous.resumeId === resumeId)
+    )
+      return previous
+  }
   const cv =
     resumeId &&
     (await prisma.resume.findFirst({ where: { id: resumeId, userId }, select: { text: true } }))
@@ -55,6 +75,7 @@ export async function prepareDraft(userId: string, jobId: string, automatic = fa
     title: job.title,
     company: job.company,
     jobUrl: job.url,
+    listingVersion: version,
     resumeId: resumeId || null,
     coverLetter,
     applyEmail: fit?.applyEmail,
@@ -63,8 +84,16 @@ export async function prepareDraft(userId: string, jobId: string, automatic = fa
   }
   const key = { userId, fingerprint: job.fingerprint }
   await prisma.application.createMany({ data: [{ ...key, ...data }], skipDuplicates: true })
-  if (previous && !previous.coverLetter) {
-    await prisma.application.updateMany({ where: { ...key, delivery: 'draft', coverLetter: '' }, data })
+  if (previous) {
+    await prisma.application.updateMany({
+      where: {
+        ...key,
+        delivery: 'draft',
+        listingVersion: previous.listingVersion,
+        coverLetter: previous.coverLetter,
+      },
+      data,
+    })
   }
   return prisma.application.findUniqueOrThrow({ where: { userId_fingerprint: key } })
 }

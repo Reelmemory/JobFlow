@@ -6,7 +6,7 @@ export function mailgunDomain() {
 }
 export function canSend(to: string) {
   if (!process.env.MAILGUN_API_KEY || !process.env.MAILGUN_DOMAIN) return false
-  if (process.env.MAIL_MODE === 'live') return process.env.VERCEL_ENV !== 'preview'
+  if (process.env.MAIL_MODE === 'live') return process.env.VERCEL_ENV === 'production'
   return (
     process.env.MAIL_MODE === 'sandbox' &&
     /^sandbox[a-z0-9]+\.mailgun\.org$/i.test(mailgunDomain()) &&
