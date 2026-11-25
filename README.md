@@ -1,6 +1,6 @@
 # JobFlow
 
-AI-powered job application platform (inspired by SwiftHunts).
+AI-powered job application platform.
 
 ## Quick Start
 
