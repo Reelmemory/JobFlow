@@ -1,18 +1,19 @@
 import { prisma } from './prisma'
 import { discover } from './discovery'
 import { prepareDraft } from './drafts'
-import { dispatch, reconcile } from './dispatch'
+import { dispatch, reconcile, reconciliationCutoff } from './dispatch'
 
 export async function runHunt() {
   const pending = await prisma.application.findMany({
-    where: { delivery: 'queued', attemptKey: { not: null } },
+    where: { delivery: 'queued', attemptedAt: { lte: reconciliationCutoff() }, attemptKey: { not: null } },
     select: { attemptKey: true },
   })
   let errors = 0
   for (const item of pending) {
     try {
       await reconcile(item.attemptKey!)
-    } catch {
+    } catch (error) {
+      console.error('Auto-Hunt operation failed', error instanceof Error ? error.name : 'Unknown error')
       errors++
     }
   }
@@ -30,11 +31,13 @@ export async function runHunt() {
           if (!app.reviewReason && ['draft', 'failed'].includes(app.delivery))
             await dispatch(user.id, app.id, true)
           processed++
-        } catch {
+        } catch (error) {
+          console.error('Auto-Hunt operation failed', error instanceof Error ? error.name : 'Unknown error')
           errors++
         }
       }
-    } catch {
+    } catch (error) {
+      console.error('Auto-Hunt operation failed', error instanceof Error ? error.name : 'Unknown error')
       errors++
     }
   }

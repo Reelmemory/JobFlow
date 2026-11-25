@@ -40,3 +40,5 @@ Verify the domain and both MX records in Mailgun. Change the route expression an
 ## Verification
 
 Run `npm run typecheck`, `npm run lint`, `npm test` and `npm run build`. The focused integration test creates a disposable PostgreSQL cluster and intercepts external job, Grok and Mailgun HTTP requests. It exercises the cron and webhook handlers, real binary fixtures and overlapping runs. See [PROJECT.md](PROJECT.md) for deployment observations and outstanding provider checks.
+
+For browser verification, run `node --env-file=.env scripts/verify-preview.cjs` with JOBFLOW_PREVIEW_URL set to the isolated preview's accessible URL. Use a development Clerk instance, Chrome and synthetic accounts. After redeploying against the same preview schema, run `node --env-file=.env scripts/verify-preview-data.cjs` with JOBFLOW_QA_SCHEMA and JOBFLOW_QA_CRON_SECRET set for that branch. The second check reopens the previous uploads, compares two accounts' private records and calls cron twice while all preview accounts are paused.

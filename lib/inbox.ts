@@ -18,4 +18,3 @@ export async function ensureInboxAddress(userId: string, clerkId: string) {
   })
   return updated.inboxAddress as string
 }
-

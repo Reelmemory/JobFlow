@@ -5,6 +5,11 @@ import { prisma } from './prisma'
 import { assess } from './discovery'
 import { canSend, getMailgunClient, mailgunDomain, sendApplicationEmail } from './mailgun'
 
+export function reconciliationCutoff() {
+  // Let an in-flight provider call (15s timeout) finish before polling its events.
+  return new Date(Date.now() - 60_000)
+}
+
 export function startOfDay() {
   const day = new Date()
   day.setUTCHours(0, 0, 0, 0)
@@ -83,7 +88,10 @@ export async function dispatch(userId: string, id: string, automatic: boolean, r
     })
     const app = await tx.application.findFirst({ where: { userId, id }, include: { job: true } })
     if (!app) return { message: 'Application unavailable.' } as const
-    if (app.delivery === 'queued' && app.attemptKey) return { pending: app.attemptKey } as const
+    if (app.delivery === 'queued' && app.attemptKey) {
+      if (app.attemptedAt && app.attemptedAt > reconciliationCutoff()) return { message: 'Send in progress.' } as const
+      return { pending: app.attemptKey } as const
+    }
     if (!['draft', 'failed'].includes(app.delivery))
       return { message: 'Already processed.' } as const
     if (

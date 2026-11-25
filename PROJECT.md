@@ -24,7 +24,6 @@ Recruiter replies use an application-specific Reply-To address. The signed inbou
 
 ## Verification and rollout
 
-The focused test runs the cron and webhook route handlers with PostgreSQL, real PDF/DOCX/TXT fixtures and intercepted provider HTTP responses. It checks pinned attachment bytes after replacement, atomic upload failure, repeated and overlapping runs, a reached cap, pause, uncertain acceptance reconciliation, manual sending and reply linkage. The browser scripts test the actual deployment with synthetic Clerk accounts.
+The focused test runs the cron and webhook route handlers with PostgreSQL, real PDF/DOCX/TXT fixtures and intercepted provider HTTP responses. It checks pinned attachment bytes after replacement, atomic upload failure, repeated and overlapping runs, a reached cap, pause, uncertain acceptance reconciliation, manual sending and reply linkage. The Vercel preview tests recovered both accounts’ uploaded CVs byte-for-byte after redeployment. Each account could read its own letter, application and linked reply, and could not read the other account’s records or CV. The deployed cron rejected an anonymous request and completed two authenticated runs with both accounts paused. The public production alias continued to serve the baseline throughout these checks.
 
 A real Grok request with synthetic inputs returned HTTP 402. The deployed environment had no Mailgun credentials and the local settings had no usable sandbox API key or verified recipient. Provider-backed generation, sandbox delivery, an actual reply and live employer submissions remain unverified. Keep live mail disabled until the sandbox workflow in the README passes. Production rollout and database upgrade are owner-controlled. [Setup and sandbox acceptance](README.md)
-

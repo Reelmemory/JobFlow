@@ -294,7 +294,7 @@ test('scheduled application lifecycle in an isolated PostgreSQL cluster', async 
   assert.equal(await dispatch(a.id, second.id, true), 'Paused or needs review.')
   await prisma.application.update({
     where: { id: second.id },
-    data: { delivery: 'queued', attemptedAt: new Date(), attemptKey: 'uncertain' },
+    data: { delivery: 'queued', attemptedAt: new Date(Date.now() - 120_000), attemptKey: 'uncertain' },
   })
   nock('https://api.mailgun.net')
     .get('/v3/' + domain + '/events')

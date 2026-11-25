@@ -10,4 +10,3 @@ export function skillsFromResumeText(text: string | null | undefined): string[] 
   const lower = text.toLowerCase()
   return SKILL_SEEDS.filter((s) => (' ' + lower.replace(/[^a-z0-9/]+/g, ' ') + ' ').includes(' ' + s + ' '))
 }
-
