@@ -22,14 +22,15 @@ export type JobSource = {
   url: string
   source: string
   remote: boolean
+  expiresAt?: string
   postedAt?: string
 }
 
-export async function fetchRemotiveJobs(search = 'software'): Promise<JobSource[]> {
+export async function fetchRemotiveJobs(search: string): Promise<JobSource[]> {
   try {
     const res = await fetch(
       `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(search)}&limit=20`,
-      { next: { revalidate: 3600 } }
+      { signal: AbortSignal.timeout(8000), cache: 'no-store' }
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -42,7 +43,7 @@ export async function fetchRemotiveJobs(search = 'software'): Promise<JobSource[
       url: j.url,
       source: 'remotive',
       remote: true,
-      postedAt: j.publication_date,
+      postedAt: j.publication_date, expiresAt: j.expiration_date || j.validThrough,
     }))
   } catch (e) {
     console.error('Remotive error', e)
@@ -64,13 +65,13 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
         continue
       }
 
-      const res = await fetch(url, { next: { revalidate: 3600 } })
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000), cache: 'no-store' })
       if (!res.ok) continue
       const data = await res.json()
 
       if (board.ats === 'greenhouse') {
         for (const j of data.jobs || []) {
-          const locName = j.location?.name || 'Nigeria'
+          const locName = j.location?.name || 'Unknown'
           const locLower = locName.toLowerCase()
           jobs.push({
             id: `gh-${board.slug}-${j.id}`,
@@ -78,7 +79,7 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
             company: board.company,
             location: locName,
             description: jobDescription(j.content),
-            url: j.absolute_url,
+            url: j.absolute_url, expiresAt: j.validThrough || j.expires_at,
             source: 'greenhouse',
             remote: locLower.includes('remote') || locLower.includes('anywhere'),
           })
@@ -89,9 +90,9 @@ export async function fetchATSJobs(): Promise<JobSource[]> {
             id: `lever-${board.slug}-${j.id}`,
             title: j.text,
             company: board.company,
-            location: j.categories?.location || 'Nigeria',
+            location: j.categories?.location || 'Unknown',
             description: jobDescription(j.descriptionPlain || j.description),
-            url: j.hostedUrl,
+            url: j.hostedUrl, expiresAt: j.validThrough || j.expiresAt,
             source: 'lever',
             remote: j.workplaceType === 'remote',
           })
@@ -116,27 +117,22 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
           'X-RapidAPI-Key': apiKey,
           'X-RapidAPI-Host': 'daily-international-job-postings.p.rapidapi.com',
         },
-        next: { revalidate: 3600 },
+        signal: AbortSignal.timeout(8000), cache: 'no-store',
       }
     )
     if (!res.ok) return []
     const data = await res.json()
 
-    const techKeywords = ['engineer', 'developer', 'software', 'tech', 'it ', 'data', 'devops', 'frontend', 'backend', 'fullstack']
-    return (data.jobs || data.results || [])
-      .filter((j: any) => {
-        const text = `${j.title || ''} ${j.description || ''}`.toLowerCase()
-        return techKeywords.some(k => text.includes(k))
-      })
-      .map((j: any) => ({
+    return (data.jobs || data.results || []).map((j: any) => ({
         id: `techmap-${j.id || j.jobId}`,
         title: j.title,
         company: j.company || j.companyName || 'Unknown',
-        location: j.location || j.city || 'Nigeria',
+        location: j.location || j.city || 'Unknown',
         description: jobDescription(j.description),
         url: j.url || j.applyUrl || '#',
         source: 'techmap',
         remote: (j.workPlace || '').toLowerCase().includes('remote'),
+        expiresAt: j.validThrough || j.expiresAt,
         postedAt: j.dateCreated || j.postedAt,
       }))
   } catch (e) {
@@ -145,18 +141,19 @@ export async function fetchTechmapJobs(apiKey?: string): Promise<JobSource[]> {
   }
 }
 
-export async function fetchAllJobs(techmapKey?: string): Promise<JobSource[]> {
+export async function fetchAllJobs(roles: string[], techmapKey?: string): Promise<JobSource[]> {
   const [remotive, ats, techmap] = await Promise.all([
-    fetchRemotiveJobs('software engineer'),
+    Promise.all(roles.map(fetchRemotiveJobs)),
     fetchATSJobs(),
     fetchTechmapJobs(techmapKey),
   ])
 
   const seen = new Set<string>()
-  const all = [...remotive, ...ats, ...techmap]
+  const all = [...remotive.flat(), ...ats, ...techmap]
 
   return all.filter(j => {
-    const key = `${j.title.toLowerCase()}-${j.company.toLowerCase()}`
+    if (!j.title || !j.company || !/^https?:\/\//i.test(j.url) || (j.expiresAt && !(Date.parse(j.expiresAt) > Date.now())) || /(?:applications (?:are )?closed|no longer accepting applications)/i.test(j.description)) return false
+    const key = `${j.title.trim().toLowerCase()}-${j.company.trim().toLowerCase()}`
     if (seen.has(key)) return false
     seen.add(key)
     return true

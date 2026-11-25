@@ -1,80 +1,51 @@
 import formData from 'form-data'
 import Mailgun from 'mailgun.js'
-import fs from 'fs/promises'
-import { absoluteResumePath } from '@/lib/resume-storage'
-
-export function mailgunConfigured() {
-  return Boolean(process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN)
-}
 
 export function mailgunDomain() {
   return process.env.MAILGUN_DOMAIN || 'sandbox.mailgun.org'
 }
-
+export function canSend(to: string) {
+  if (!process.env.MAILGUN_API_KEY || !process.env.MAILGUN_DOMAIN) return false
+  if (process.env.MAIL_MODE === 'live') return process.env.VERCEL_ENV !== 'preview'
+  return (
+    process.env.MAIL_MODE === 'sandbox' &&
+    /^sandbox[a-z0-9]+\.mailgun\.org$/i.test(mailgunDomain()) &&
+    to.toLowerCase() === process.env.MAILGUN_TEST_RECIPIENT?.trim().toLowerCase()
+  )
+}
 export function getMailgunClient() {
-  const apiKey = process.env.MAILGUN_API_KEY
-  if (!apiKey) return null
-  const mg = new Mailgun(formData)
-  return mg.client({ username: 'api', key: apiKey })
+  const key = process.env.MAILGUN_API_KEY
+  return key
+    ? new Mailgun(formData).client({
+        username: 'api',
+        key,
+        url:
+          process.env.MAILGUN_REGION === 'EU'
+            ? 'https://api.eu.mailgun.net'
+            : 'https://api.mailgun.net',
+        timeout: 15000,
+      })
+    : null
 }
 
-export type SendApplicationEmailParams = {
-  fromAddress: string
-  fromName?: string | null
-  to: string
-  bcc?: string | null
-  subject: string
-  text: string
-  applicationId: string
-  resumeUrl?: string | null
-  resumeFileName?: string | null
+export async function sendApplicationEmail(
+  app: { id: string; title: string; applyEmail: string; coverLetter: string; attemptKey: string },
+  cv: { filename: string; bytes: Buffer },
+) {
+  if (!canSend(app.applyEmail)) throw new Error('Mail sending is unavailable for this recipient.')
+  const domain = mailgunDomain()
+  const client = getMailgunClient()!
+  return client.messages.create(domain, {
+    from: 'JobFlow <applications@' + domain + '>',
+    to: [app.applyEmail],
+    subject: 'Application for ' + app.title,
+    text: app.coverLetter,
+    attachment: [{ filename: cv.filename, data: cv.bytes }],
+    'h:Reply-To': 'reply-' + app.id + '@' + domain,
+    'h:Message-Id': '<' + app.attemptKey + '@' + domain + '>',
+    'v:attempt': app.attemptKey,
+  })
 }
-
-export async function sendApplicationEmail(params: SendApplicationEmailParams) {
-  const client = getMailgunClient()
-  const domain = process.env.MAILGUN_DOMAIN
-  if (!client || !domain) {
-    throw new Error('Mailgun is not configured. Set MAILGUN_API_KEY and MAILGUN_DOMAIN.')
-  }
-
-  const from = params.fromName
-    ? `${params.fromName} <${params.fromAddress}>`
-    : params.fromAddress
-
-  const message: Record<string, unknown> = {
-    from,
-    to: [params.to],
-    subject: params.subject,
-    text: params.text,
-    'h:Reply-To': params.fromAddress,
-    'h:X-JobFlow-Application-Id': params.applicationId,
-  }
-
-  if (params.bcc && params.bcc !== params.to) {
-    message.bcc = [params.bcc]
-  }
-
-  if (params.resumeUrl) {
-    try {
-      const abs = absoluteResumePath(params.resumeUrl)
-      const data = await fs.readFile(abs)
-      message.attachment = [
-        {
-          filename: params.resumeFileName || 'resume.pdf',
-          data,
-        },
-      ]
-    } catch (e) {
-      console.error('Resume attach skipped', e)
-    }
-  }
-
-  await client.messages.create(domain, message as never)
-}
-
 export function detectOtp(subject: string, body: string) {
-  const blob = `${subject}\n${body}`.toLowerCase()
-  if (/\b(otp|one[- ]time|verification code|security code|2fa)\b/.test(blob)) return true
-  if (/\b\d{4,8}\b/.test(blob) && /\b(code|verify|verification)\b/.test(blob)) return true
-  return false
+  return /\b(otp|one[- ]time|verification code|security code|2fa)\b/i.test(subject + ' ' + body)
 }

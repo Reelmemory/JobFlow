@@ -1,79 +1,94 @@
+import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
+import { applicationAction } from './actions'
 import { StatusSelect } from '@/components/status-select'
 
-export default async function ApplicationsPage() {
-  const { userId: clerkId } = await auth()
-
-  let applications: any[] = []
-
-  if (clerkId) {
-    const user = await prisma.user.findUnique({ where: { clerkId } })
-    if (user) {
-      applications = await prisma.application.findMany({
-        where: { userId: user.id },
-        orderBy: { appliedAt: 'desc' },
-      })
-    }
-  }
-
+export default async function ApplicationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ message?: string; review?: string }>
+}) {
+  const { userId: clerkId } = await auth.protect()
+  const params = await searchParams
+  const apps = await prisma.application.findMany({
+    where: {
+      user: { clerkId },
+      ...(params.review ? { delivery: 'draft', reviewReason: { not: null } } : {}),
+    },
+    orderBy: { appliedAt: 'desc' },
+  })
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-2 sm:text-3xl">Applications</h1>
-      <p className="text-slate-600 mb-6 text-sm sm:text-base">
-        Every job applied to on your behalf. Open one to see the cover letter we generated.
-      </p>
-
-      {applications.length === 0 ? (
-        <div className="bg-white p-8 rounded-xl border text-center text-slate-500">
-          No applications yet. Go to Job Matches and click “Apply with AI”.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {applications.map((app) => (
-            <div key={app.id} className="bg-white p-4 sm:p-5 rounded-xl border">
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
-                <div className="min-w-0">
-                  <h3 className="font-semibold break-words">{app.title}</h3>
-                  <p className="text-sm text-slate-500">{app.company}</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {app.matchScore ? `${app.matchScore}% match · ` : ''}
-                    {new Date(app.appliedAt).toLocaleDateString()}
-                    {app.source === 'email' && app.applyEmail
-                      ? ` · emailed ${app.applyEmail}`
-                      : app.source === 'email'
-                        ? ' · sent by email'
-                        : ' · letter saved only'}
-                  </p>
-                </div>
-                <div className="shrink-0 w-full sm:w-auto">
-                  <StatusSelect id={app.id} current={app.status} />
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-4 items-center">
-                {app.notes?.startsWith('http') && (
-                  <a
-                    href={app.notes}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-blue-600 underline"
-                  >
-                    View job posting
-                  </a>
-                )}
-                {app.coverLetter && (
-                  <details>
-                    <summary className="text-sm text-blue-600 cursor-pointer">View cover letter</summary>
-                    <pre className="mt-2 text-sm text-slate-700 whitespace-pre-wrap bg-slate-50 p-3 rounded">
-                      {app.coverLetter}
-                    </pre>
-                  </details>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+      <h1 className="text-3xl font-bold mb-2">Applications</h1>
+      <div className="flex gap-4 text-blue-700 underline mb-5">
+        <Link href="/dashboard/applications">All applications</Link>
+        <Link href="?review=1">Needs review</Link>
+      </div>
+      {params.message && (
+        <p role="status" className="rounded border bg-white p-3 mb-4">
+          {params.message}
+        </p>
       )}
+      {!apps.length && <p>No applications here yet.</p>}
+      {apps.map((a) => (
+        <article
+          id={'app-' + a.id}
+          key={a.id}
+          className="bg-white rounded-xl border p-5 mb-3 space-y-2"
+        >
+          <h2 className="font-semibold">
+            {a.title} · {a.company}
+          </h2>
+          <p className="text-sm capitalize">
+            {a.delivery} · {a.source}
+          </p>
+          {a.reviewReason && <p className="text-sm text-amber-800">{a.reviewReason}</p>}
+          {a.applyEmail && <p className="text-sm">Application address · {a.applyEmail}</p>}
+          <div className="flex gap-4 text-sm text-blue-700 underline">
+            {(a.jobUrl || a.notes)?.match(/^https?:\/\//i) && (
+              <a href={(a.jobUrl || a.notes)!} target="_blank" rel="noreferrer">
+                Original listing
+              </a>
+            )}
+            {a.resumeId && (
+              <a href={'/api/profile/resume?version=' + a.resumeId}>Download attached CV</a>
+            )}
+          </div>
+          {a.coverLetter && (
+            <details>
+              <summary>Review cover letter</summary>
+              <p className="mt-2 whitespace-pre-wrap text-sm">{a.coverLetter}</p>
+            </details>
+          )}
+          {a.submittedAt && <StatusSelect id={a.id} current={a.status} />}
+          <form action={applicationAction}>
+            <input type="hidden" name="id" value={a.id} />
+            {!a.coverLetter && a.jobId && (
+              <button className="text-blue-700 underline" name="action" value="prepare">
+                Prepare letter again
+              </button>
+            )}
+            {a.coverLetter &&
+              a.resumeId &&
+              a.applyEmail &&
+              ['draft', 'failed'].includes(a.delivery) && (
+                <button
+                  name="action"
+                  value="send"
+                  className="rounded bg-blue-600 px-4 py-2 text-sm text-white"
+                >
+                  Send reviewed application
+                </button>
+              )}
+            {a.delivery === 'queued' && (
+              <button name="action" value="check" className="underline">
+                Check provider status
+              </button>
+            )}
+          </form>
+        </article>
+      ))}
     </div>
   )
 }

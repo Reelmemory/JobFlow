@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { UserButton } from '@clerk/nextjs'
+import { UserButton, useAuth } from '@clerk/nextjs'
 import { BrandMark } from '@/components/brand-mark'
 
 const nav = [
@@ -49,12 +49,17 @@ function NavLinks({
 }
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const pathname = usePathname()
-
+  const { isLoaded, isSignedIn } = useAuth()
   useEffect(() => {
-    setMenuOpen(false)
-  }, [pathname])
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) window.location.reload() }
+    window.addEventListener("pageshow", restored)
+    if (isLoaded && !isSignedIn) window.location.replace("/sign-in")
+    return () => window.removeEventListener("pageshow", restored)
+  }, [isLoaded, isSignedIn])
+  const pathname = usePathname()
+  const [openPath, setOpenPath] = useState<string | null>(null)
+  const menuOpen = openPath === pathname
+  const setMenuOpen = (open: boolean) => setOpenPath(open ? pathname : null)
 
   useEffect(() => {
     if (menuOpen) {
@@ -67,6 +72,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [menuOpen])
 
+  if (!isLoaded || !isSignedIn) return null
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       <header className="md:hidden sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">

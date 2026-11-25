@@ -38,7 +38,7 @@ export async function PATCH(
   const application = await prisma.application.updateMany({
     where: {
       id,
-      user: { clerkId: userId },
+      user: { clerkId: userId }, submittedAt: { not: null },
     },
     data: { status },
   })

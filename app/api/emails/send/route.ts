@@ -1,55 +1,48 @@
-import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
-import { getMailgunClient } from '@/lib/mailgun'
+import { canSend, getMailgunClient, mailgunDomain } from '@/lib/mailgun'
 
 export async function POST(req: Request) {
   const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { to, subject, body, replyToEmailId } = await req.json()
-
-  if (!to || !subject || !body) {
-    return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
-  }
-
-  const user = await prisma.user.findUnique({ where: { clerkId: userId } })
-  if (!user?.inboxAddress) {
-    return NextResponse.json({ error: 'No inbox address set' }, { status: 400 })
-  }
-
-  const domain = process.env.MAILGUN_DOMAIN
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const { replyToEmailId, body } = await req.json()
+  if (typeof replyToEmailId !== 'string' || typeof body !== 'string' || !body.trim())
+    return Response.json({ error: 'Choose a message and enter a reply.' }, { status: 400 })
+  const original = await prisma.email.findFirst({
+    where: { id: replyToEmailId, direction: 'inbound', user: { clerkId: userId } },
+  })
+  if (!original?.to) return Response.json({ error: 'Message unavailable.' }, { status: 404 })
+  const to = original.from
   const client = getMailgunClient()
-  if (!client || !domain) {
-    return NextResponse.json({ error: 'Mailgun not configured' }, { status: 500 })
-  }
-
+  if (!client || !canSend(to))
+    return Response.json({ error: 'Mail is unavailable for this recipient.' }, { status: 400 })
+  const subject = 'Re: ' + original.subject
   try {
-
-    await client.messages.create(domain, {
-      from: user.inboxAddress,
+    const result = await client.messages.create(mailgunDomain(), {
+      from: original.to,
       to: [to],
       subject,
       text: body,
-      'h:Reply-To': user.inboxAddress,
+      'h:Reply-To': original.to,
     })
-
-    // Save outbound email
     await prisma.email.create({
       data: {
-        userId: user.id,
-        from: user.inboxAddress,
+        userId: original.userId,
+        applicationId: original.applicationId,
+        from: original.to,
         to,
         subject,
         body,
         direction: 'outbound',
         isRead: true,
+        messageId: result.id,
       },
     })
-
-    return NextResponse.json({ success: true })
-  } catch (e: any) {
-    console.error('Send error', e)
-    return NextResponse.json({ error: e.message || 'Failed to send' }, { status: 500 })
+    return Response.json({ success: true })
+  } catch {
+    return Response.json(
+      { error: 'Could not confirm the reply. Check the provider before retrying.' },
+      { status: 502 },
+    )
   }
 }

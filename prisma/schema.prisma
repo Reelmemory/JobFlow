@@ -14,10 +14,12 @@ model User {
   name         String?
   inboxAddress String?  @unique
   autoHunt     Boolean  @default(false)
-  dailyQuota   Int      @default(15)
+  dailyQuota   Int      @default(3)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  huntResumeId String?
+  resumes Resume[]
   profile      Profile?
   applications Application[]
   emails       Email[]
@@ -27,6 +29,9 @@ model Profile {
   id          String   @id @default(cuid())
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentResumeId String?
+  country String @default("Nigeria")
+  experienceYears Int @default(0)
   resumeText       String?  @db.Text
   resumeUrl        String?
   resumeFileName   String?
@@ -39,7 +44,21 @@ model Profile {
   updatedAt   DateTime @updatedAt
 }
 
+model Resume {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename String
+  text String @db.Text
+  bytes Bytes
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+}
+
 model Job {
+  fingerprint String? @unique
+  remote Boolean @default(false)
+  expiresAt DateTime?
   id          String   @id @default(cuid())
   externalId  String?
   title       String
@@ -62,7 +81,17 @@ model Application {
   job         Job?     @relation(fields: [jobId], references: [id])
   title       String
   company     String
-  status      String   @default("applied")
+  status      String   @default("draft")
+  fingerprint String?
+  jobUrl String?
+  resumeId String?
+  reviewReason String?
+  delivery String @default("draft")
+  attemptedAt DateTime?
+  submittedAt DateTime?
+  failedAt DateTime?
+  providerId String? @unique
+  attemptKey String? @unique
   coverLetter String   @db.Text
   matchScore  Int?
   appliedAt   DateTime @default(now())
@@ -71,6 +100,8 @@ model Application {
   applyEmail  String?
 
   emails      Email[]
+  @@unique([userId, fingerprint])
+  @@index([userId, attemptedAt])
 }
 
 model Email {

@@ -15,6 +15,8 @@ type Job = {
   url: string
   source: string
   remote: boolean
+  reason?: string
+  needsReview?: boolean
   match?: number
   applied?: boolean
   applyEmail?: string | null
@@ -96,72 +98,14 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
     })
   }, [jobs, minMatch, sourceFilter, remoteFilter, hideApplied])
 
-  async function applyWithAI(job: Job, applyTo?: string) {
+  async function applyWithAI(job: Job) {
     setApplying(job.id)
-    setMessage('')
-
     try {
-      const { ok, data, error: applyError } = await request<{
-        success?: boolean
-        needsApplyEmail?: boolean
-        alreadyApplied?: boolean
-        sent?: boolean
-        applyTo?: string
-        warning?: string
-        error?: string
-      }>('/api/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: job.id,
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          description: job.description,
-          matchScore: job.match ?? 50,
-          url: job.url,
-          source: job.source,
-          applyTo: applyTo || job.applyEmail || undefined,
-        }),
-      })
-
-      if (!data) {
-        setMessage(applyError || 'Apply failed')
-        return
-      }
-      if (data.needsApplyEmail) {
-        const typed = window.prompt(
-          `No apply email found for ${job.company}. Paste the hiring email to send from your JobFlow inbox:`,
-        )
-        if (typed?.includes('@')) {
-          await applyWithAI(job, typed.trim())
-          return
-        }
-        setMessage(data.error || 'Need an employer email to send the application.')
-        return
-      }
-      if (data.success) {
-        setJobs((prev) => setAppliedLocal(prev, job.id))
-        if (data.alreadyApplied) {
-          setMessage(`You already applied to ${job.title} at ${job.company}.`)
-        } else if (data.sent) {
-          setMessage(
-            `Emailed ${job.title} at ${job.company} from your JobFlow inbox to ${data.applyTo}. Replies land in Inbox (BCC to your personal email).`,
-          )
-        } else {
-          setMessage(
-            data.warning ||
-              `Saved cover letter for ${job.title}. Email was not sent — check Mailgun keys.`,
-          )
-        }
-      } else {
-        setMessage(data.error || 'Apply failed')
-      }
-    } catch {
-      setMessage('Network error while applying')
-    } finally {
-      setApplying(null)
-    }
+      const { ok, error } = await request('/api/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: job.id }) })
+      if (!ok) { setMessage(error || 'Could not prepare draft'); return }
+      setJobs(prev => setAppliedLocal(prev, job.id))
+      setMessage('Draft saved. Open Applications to review the letter and CV.')
+    } finally { setApplying(null) }
   }
 
   const sourceSummary = meta.sources
@@ -206,7 +150,7 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
           <p className="font-medium mb-1">Database offline — showing live jobs only</p>
           <p>{dbWarning}</p>
           <p className="mt-2 text-xs text-amber-800">
-            Match scores and “already applied” need the DB. Wake Neon in the console, fix{' '}
+            Match scores and “tracked jobs” need the DB. Wake Neon in the console, fix{' '}
             <code className="bg-amber-100 px-1 rounded">DATABASE_URL</code>, restart{' '}
             <code className="bg-amber-100 px-1 rounded">npm run dev</code>.
           </p>
@@ -266,7 +210,7 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
             onChange={(e) => setHideApplied(e.target.checked)}
             className="rounded"
           />
-          Hide already applied
+          Hide tracked jobs
         </label>
         {!loading && (
           <p className="text-xs text-slate-500 sm:ml-auto sm:self-center w-full sm:w-auto">
@@ -274,7 +218,7 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
             {sourceSummary ? ` (${sourceSummary})` : ''}
             {typeof meta.fetchedTotal === 'number' ? ` · ${meta.fetchedTotal} fetched` : ''}
             {typeof meta.appliedCount === 'number' && meta.appliedCount > 0
-              ? ` · ${meta.appliedCount} already applied`
+              ? ` · ${meta.appliedCount} tracked jobs`
               : ''}
           </p>
         )}
@@ -307,6 +251,7 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
                     {job.remote ? 'Remote' : 'On-site'} · via {job.source}
                     {job.applyEmail ? ` · apply ${job.applyEmail}` : ''}
                   </p>
+                  <p className="text-sm mt-2">{job.needsReview && <strong>Needs review · </strong>}{job.reason}</p>
                   <p className="text-sm text-slate-600 mt-3 whitespace-pre-wrap">
                     {expanded ? job.description : `${job.description.slice(0, 280)}${job.description.length > 280 ? '…' : ''}`}
                   </p>
@@ -328,7 +273,7 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
                   </span>
                   {job.applied ? (
                     <span className="text-sm font-medium text-slate-500 px-4 py-2 rounded-lg bg-slate-100 text-center">
-                      Already applied
+                      In Applications
                     </span>
                   ) : (
                     <button
@@ -337,7 +282,7 @@ export function MatchesClient({ initial }: { initial: JobsResponse }) {
                       disabled={applying === job.id}
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
                     >
-                      {applying === job.id ? 'Sending…' : 'Apply by email'}
+                      {applying === job.id ? 'Preparing…' : 'Prepare draft'}
                     </button>
                   )}
                   <a

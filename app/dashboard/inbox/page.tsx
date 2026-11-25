@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 
 type Email = {
   id: string
+  direction: string
+  applicationId?: string
   from: string
   to: string
   subject: string
@@ -128,10 +130,10 @@ export default function InboxPage() {
                 <h2 className="text-lg sm:text-xl font-semibold mb-1 break-words">{selected.subject}</h2>
                 <p className="text-sm text-slate-500 mb-4 break-all">From: {selected.from}</p>
                 <pre className="whitespace-pre-wrap text-sm text-slate-700 mb-6 break-words">
-                  {selected.body}
+                  {selected.applicationId && <a className="block text-blue-700 underline" href={"/dashboard/applications#app-"+selected.applicationId}>View linked application</a>}{selected.body}
                 </pre>
               </div>
-              <ReplyForm to={selected.from} subject={`Re: ${selected.subject}`} />
+              {selected.direction !== 'outbound' && <ReplyForm key={selected.id} id={selected.id} />}
             </>
           ) : (
             <div className="text-slate-400 text-center mt-12 lg:mt-20 text-sm">
@@ -144,7 +146,7 @@ export default function InboxPage() {
   )
 }
 
-function ReplyForm({ to, subject }: { to: string; subject: string }) {
+function ReplyForm({ id }: { id: string }) {
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
   const [msg, setMsg] = useState('')
@@ -157,7 +159,7 @@ function ReplyForm({ to, subject }: { to: string; subject: string }) {
       const res = await fetch('/api/emails/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject, body }),
+        body: JSON.stringify({ replyToEmailId: id, body }),
       })
       const data = await res.json()
       if (data.success) {

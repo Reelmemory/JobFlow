@@ -32,8 +32,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ClerkProvider
-          signInForceRedirectUrl="/dashboard"
-          signUpForceRedirectUrl="/dashboard"
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          afterSignOutUrl="/"
           signInFallbackRedirectUrl="/dashboard"
           signUpFallbackRedirectUrl="/dashboard"
         >

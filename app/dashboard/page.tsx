@@ -1,3 +1,4 @@
+import { startOfDay } from '@/lib/dispatch'
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
@@ -20,20 +21,13 @@ export default async function DashboardPage() {
   })
 
   const applications = user?.applications ?? []
-  const totalApplications = user
-    ? await prisma.application.count({ where: { userId: user.id } })
-    : 0
-  const interviews = user
-    ? await prisma.application.count({
-        where: { userId: user.id, status: { in: ['interview', 'offer'] } },
-      })
-    : 0
-  const awaiting = user
-    ? await prisma.application.count({
-        where: { userId: user.id, status: { in: ['applied', 'viewed'] } },
-      })
-    : 0
-
+  const owner = { user: { clerkId } }
+  const [sent, failed, attention, replies] = await Promise.all([
+    prisma.application.count({ where: { ...owner, submittedAt: { gte: startOfDay() } } }),
+    prisma.application.count({ where: { ...owner, failedAt: { gte: startOfDay() } } }),
+    prisma.application.count({ where: { ...owner, delivery: 'draft', reviewReason: { not: null } } }),
+    prisma.email.count({ where: { ...owner, direction: 'inbound', isRead: false } }),
+  ])
   const hasResume = Boolean(
     user?.profile?.resumeText && user.profile.resumeText.length >= 20,
   )
@@ -41,7 +35,7 @@ export default async function DashboardPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-2 sm:text-3xl">Dashboard</h1>
-      <p className="text-slate-600 mb-8">Your job search at a glance.</p>
+      <p className="text-slate-600 mb-8"><Link href="/dashboard/inbox">{replies} unread inbox messages</Link></p>
 
       {!hasResume && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
@@ -55,16 +49,16 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white p-6 rounded-xl border shadow-sm">
-          <div className="text-2xl font-bold text-green-600">{totalApplications}</div>
-          <div className="text-sm text-slate-500">Applications sent</div>
+          <div className="text-2xl font-bold text-green-600">{sent}</div>
+          <div className="text-sm text-slate-500">Submitted today (UTC)</div>
         </div>
         <div className="bg-white p-6 rounded-xl border shadow-sm">
-          <div className="text-2xl font-bold text-amber-600">{interviews}</div>
-          <div className="text-sm text-slate-500">Interviews & offers</div>
+          <div className="text-2xl font-bold text-amber-600">{failed}</div>
+          <div className="text-sm text-slate-500">Failed today (UTC)</div>
         </div>
         <div className="bg-white p-6 rounded-xl border shadow-sm">
-          <div className="text-2xl font-bold text-blue-600">{awaiting}</div>
-          <div className="text-sm text-slate-500">Awaiting response</div>
+          <div className="text-2xl font-bold text-blue-600">{attention}</div>
+          <div className="text-sm text-slate-500"><Link href="/dashboard/applications?review=1">Need your review</Link></div>
         </div>
       </div>
 
@@ -104,7 +98,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
                 <span className="text-xs capitalize px-2 py-1 rounded-full bg-slate-100 text-slate-600 shrink-0">
-                  {app.status}
+                  {app.delivery}
                 </span>
               </li>
             ))}
