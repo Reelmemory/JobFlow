@@ -9,6 +9,8 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
   const [targetRoles, setTargetRoles] = useState(initial.targetRoles)
   const [locations, setLocations] = useState(initial.locations)
   const [remoteOnly, setRemoteOnly] = useState(initial.remoteOnly)
+  const [country, setCountry] = useState(initial.country)
+  const [experienceYears, setExperienceYears] = useState(initial.experienceYears)
   const [skills, setSkills] = useState<string[]>(initial.skills)
   const [resumeFileName, setResumeFileName] = useState<string | null>(initial.resumeFileName)
   const [resumePreview, setResumePreview] = useState<string | null>(initial.resumePreview)
@@ -24,6 +26,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const uploadResume = useCallback(async (file: File) => {
+    if (file.size > 4_000_000) { setError('Choose a file of 4 MB or less.'); return }
     setUploading(true)
     setError('')
     setMessage('')
@@ -49,10 +52,10 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
         if (data.profile.locations?.length) {
           setLocations(data.profile.locations.join(', '))
         }
-        if (data.profile.skills?.length) setSkills(data.profile.skills)
+        setSkills(data.profile.skills)
       }
       setMessage(
-        'Resume uploaded. We extracted your experience for matching and cover letters. Review roles and locations below, then save if you changed them.',
+        'Resume uploaded. Review your extracted text and save any changes to your preferences.',
       )
     } catch {
       setError('Network error while uploading')
@@ -82,7 +85,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
     const data = await saveProfileAction({
       targetRoles: targetRoles.split(',').map((s) => s.trim()).filter(Boolean),
       locations: locations.split(',').map((s) => s.trim()).filter(Boolean),
-      remoteOnly,
+      remoteOnly, country, experienceYears,
     })
 
     if (data && 'success' in data && data.success) {
@@ -98,7 +101,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
     <div className="w-full max-w-2xl">
       <h1 className="text-2xl font-bold mb-2 sm:text-3xl">Profile</h1>
       <p className="text-slate-600 mb-4 text-sm sm:text-base">
-        Attach your resume file. We pull out skills, roles, and locations for matching and AI cover letters.
+        Attach your resume file. We extract the text and skills for matching and AI cover letters.
       </p>
       <p className="mb-6 text-sm">
         <Link href="/dashboard/matches" className="text-blue-600 hover:underline">
@@ -138,7 +141,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
               className="hidden"
               onChange={onFileChange}
             />
@@ -149,7 +152,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
                 <p className="font-medium text-slate-800 mb-1">
                   Drop your resume here or click to browse
                 </p>
-                <p className="text-xs text-slate-500">PDF, DOCX, or TXT · max 5 MB</p>
+                <p className="text-xs text-slate-500">PDF, DOCX, or TXT · max 4 MB</p>
               </>
             )}
           </div>
@@ -158,7 +161,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm bg-slate-50 rounded-lg p-3">
               <span className="truncate">
                 <span className="text-slate-500">On file:</span>{' '}
-                <span className="font-medium">{resumeFileName}</span>
+                <a className="font-medium underline" href="/api/profile/resume">{resumeFileName}</a>
                 {resumeTextLength > 0 && (
                   <span className="text-slate-400"> · {resumeTextLength.toLocaleString()} chars extracted</span>
                 )}
@@ -203,7 +206,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
 
         <div className="border-t pt-6 space-y-6">
           <p className="text-sm text-slate-500">
-            Roles and locations are filled from your resume when empty. You can edit them anytime.
+            These preferences also apply to Auto-Hunt.
           </p>
           <div>
             <label className="block text-sm font-medium mb-1">Target roles (comma-separated)</label>
@@ -223,6 +226,8 @@ export function ProfileForm({ initial }: { initial: ProfileFormState }) {
               placeholder="Remote, Lagos, UK"
             />
           </div>
+          <label className="block">Country of residence<input className="block w-full rounded border p-2" value={country} onChange={e => setCountry(e.target.value)} /></label>
+          <label className="block">Years of relevant experience<input className="block w-full rounded border p-2" type="number" min="0" max="60" value={experienceYears} onChange={e => setExperienceYears(Number(e.target.value))} /></label>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

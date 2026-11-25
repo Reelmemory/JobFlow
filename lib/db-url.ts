@@ -1,17 +1,11 @@
-/**
- * Normalizes Neon DATABASE_URL for Prisma on Windows (drops channel_binding=require).
- */
-export function normalizeDatabaseUrl(url: string | undefined): string | undefined {
-  if (!url) return url
-  let out = url
-  out = out.replace(/[&?]channel_binding=require/gi, '')
-  out = out.replace(/\?&/, '?')
-  out = out.replace(/\?$/, '')
-  if (!out.includes('connect_timeout=')) {
-    out += out.includes('?') ? '&connect_timeout=15' : '?connect_timeout=15'
+export function normalizeDatabaseUrl(value: string | undefined) {
+  if (!value) return value
+  const url = new URL(value)
+  url.searchParams.delete('channel_binding')
+  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout','15')
+  if (!url.searchParams.has('sslmode')) url.searchParams.set('sslmode','require')
+  if (process.env.VERCEL_ENV === 'preview' && process.env.JOBFLOW_PREVIEW_SCHEMA) {
+    url.searchParams.set('schema',process.env.JOBFLOW_PREVIEW_SCHEMA)
   }
-  if (!out.includes('sslmode=')) {
-    out += out.includes('?') ? '&sslmode=require' : '?sslmode=require'
-  }
-  return out
+  return url.toString()
 }

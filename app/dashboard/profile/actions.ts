@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 import { processResumeUpload, saveProfilePreferences } from '@/lib/profile-ops'
 import { prismaErrorMessage } from '@/lib/prisma-errors'
@@ -16,7 +17,9 @@ export async function uploadResumeAction(formData: FormData) {
   }
 
   try {
-    return await processResumeUpload(userId, file)
+    const result = await processResumeUpload(userId, file)
+    revalidatePath('/dashboard/profile')
+    return result
   } catch (error) {
     console.error(error)
     const { message } = prismaErrorMessage(error)
@@ -27,6 +30,8 @@ export async function uploadResumeAction(formData: FormData) {
 export async function saveProfileAction(input: {
   targetRoles: string[]
   locations: string[]
+  country?: string
+  experienceYears?: number
   remoteOnly: boolean
 }) {
   const { userId } = await auth()

@@ -1,3 +1,4 @@
+import { HuntSettings } from './hunt-settings'
 import { auth } from '@clerk/nextjs/server'
 import { loadProfileForm } from '@/lib/profile-ops'
 import { ProfileForm } from './profile-form'
@@ -9,5 +10,5 @@ export default async function ProfilePage() {
   if (!userId) return null
 
   const initial = await loadProfileForm(userId)
-  return <ProfileForm initial={initial} />
+  return <><ProfileForm initial={initial} /><HuntSettings clerkId={userId} /></>
 }
