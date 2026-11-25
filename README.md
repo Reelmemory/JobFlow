@@ -1,6 +1,6 @@
 # JobFlow
 
-JobFlow discovers roles using your profile, drafts letters with Grok and sends email applications with the CV version you selected. The dashboard, applications and recruiter inbox require Clerk sign-in. [Open JobFlow](https://usejobflow.vercel.app)
+JobFlow discovers roles using your profile, drafts letters with OpenAI or Grok and sends email applications with the CV version you selected. The dashboard, applications and recruiter inbox require Clerk sign-in. [Open JobFlow](https://usejobflow.vercel.app)
 
 ## Run locally
 
@@ -16,7 +16,7 @@ Choose **Prepare draft** in Job Matches, then open **Applications** to inspect t
 
 1. Back up the existing Neon database. Test the upgrade on a branch first. For the schema at commit `5b80245`, run `npx prisma db execute --schema prisma/schema.prisma --file prisma/upgrade-auto-hunt.sql` **once**, before deploying the new code. This transactional upgrade preserves existing records, marks historical sends with an outbound receipt, and flags uncertain history. A fresh empty database uses `npm run db:push`.
 2. Keep the Vercel production domain `usejobflow.vercel.app`. Configure Clerk's sign-in and sign-up paths as shown in the environment example. Fallback redirects go to `/dashboard`. Remove obsolete FORCE redirect variables if you want authenticated deep links to return to their original destination.
-3. Set `GROK_API_KEY` or `XAI_API_KEY` and a funded `GROK_MODEL`. Uploads and preference saving work independently. An unavailable model leaves a review item with a preparation retry.
+3. Set `OPENAI_API_KEY` for OpenAI cover letters. `OPENAI_MODEL` defaults to `gpt-4.1-mini`. With no OpenAI key, JobFlow uses `GROK_API_KEY` or `XAI_API_KEY` and `GROK_MODEL`. Uploads and preference saving work independently. An unavailable model leaves a review item with a preparation retry.
 4. Set a random `CRON_SECRET` of at least 32 bytes in Vercel. Vercel calls `GET /api/cron/hunt` with the Bearer secret. Cron runs on production deployments. Exercise a preview with the same authenticated GET against its isolated database. [Vercel Cron](https://vercel.com/docs/cron-jobs/manage-cron-jobs)
 5. Configure the sandbox below, then redeploy to load the environment. Keep mail off until the sandbox test succeeds.
 

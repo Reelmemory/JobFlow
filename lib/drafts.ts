@@ -67,7 +67,7 @@ export async function prepareDraft(
       coverLetter = result.letter
       reasons.push(...result.missing)
     } catch {
-      reasons.push('Grok could not prepare a verified draft. Retry preparation.')
+      reasons.push('The AI provider could not prepare a verified draft. Retry preparation.')
     }
   }
   const data = {

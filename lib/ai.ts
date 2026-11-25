@@ -13,17 +13,22 @@ export async function generateCoverLetter(input: {
   company: string
   jobDescription: string
 }) {
-  const apiKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = openaiKey || process.env.GROK_API_KEY || process.env.XAI_API_KEY
+  const model = openaiKey
+    ? process.env.OPENAI_MODEL || 'gpt-4.1-mini'
+    : process.env.GROK_MODEL || 'grok-3-mini'
   if (!apiKey || !input.resumeText.trim() || !input.jobDescription.trim())
-    throw new Error('CV, listing and Grok are required.')
+    throw new Error('A CV, job description and AI provider key are required.')
   const client = new OpenAI({
     apiKey,
-    baseURL: process.env.GROK_BASE_URL || 'https://api.x.ai/v1',
+    baseURL: openaiKey ? 'https://api.openai.com/v1' : process.env.GROK_BASE_URL || 'https://api.x.ai/v1',
     maxRetries: 0,
     timeout: 25000,
   })
   const result = await client.chat.completions.create({
-    model: process.env.GROK_MODEL || 'grok-3-mini',
+    model,
+    ...(openaiKey && { store: false }),
     response_format: { type: 'json_object' },
     messages: [
       {
