@@ -22,7 +22,7 @@ export default async function ApplicationsPage({
   return (
     <div>
       <h1 className="text-3xl font-bold mb-2">Applications</h1>
-      <div className="flex gap-4 text-blue-700 underline mb-5">
+      <div className="flex gap-4 text-blue-700 mb-5">
         <Link href="/dashboard/applications">All applications</Link>
         <Link href="?review=1">Needs review</Link>
       </div>
@@ -46,7 +46,7 @@ export default async function ApplicationsPage({
           </p>
           {a.reviewReason && <p className="text-sm text-amber-800">{a.reviewReason}</p>}
           {a.applyEmail && <p className="text-sm">Application address · {a.applyEmail}</p>}
-          <div className="flex gap-4 text-sm text-blue-700 underline">
+          <div className="flex gap-4 text-sm text-blue-700">
             {(a.jobUrl || a.notes)?.match(/^https?:\/\//i) && (
               <a href={a.jobUrl || a.notes || undefined} target="_blank" rel="noreferrer">
                 Original listing
@@ -67,7 +67,7 @@ export default async function ApplicationsPage({
             <input type="hidden" name="id" value={a.id} />
             <input type="hidden" name="reviewed" value={reviewVersion(a)} />
             {a.delivery === 'draft' && a.jobId && (
-              <button className="text-blue-700 underline" name="action" value="prepare">
+              <button className="text-blue-700" name="action" value="prepare">
                 Prepare letter with current CV
               </button>
             )}
@@ -84,7 +84,7 @@ export default async function ApplicationsPage({
                 </button>
               )}
             {a.delivery === 'queued' && (
-              <button name="action" value="check" className="underline">
+              <button name="action" value="check" className="text-blue-700">
                 Check provider status
               </button>
             )}
